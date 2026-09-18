@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   Trash2,
   Upload,
   RefreshCw,
-  X,
+  MoreHorizontal,
   Gamepad2,
 } from "lucide-react";
 import type { Deck } from "@/types";
@@ -26,109 +26,175 @@ interface DeckCardProps {
 export function DeckCard({ deck, onDelete }: DeckCardProps) {
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showGamesModal, setShowGamesModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
 
   const totalCards = deck.card_count || 0;
   const progress = deck.progress_percent || 0;
   const dueCount = deck.due_count || 0;
   const newCount = totalCards - (deck.learned_count || 0);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
+
+  const handleCardClick = () => {
+    router.push(`/decks/${deck.id}`);
+  };
 
   return (
     <>
-      <div className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:shadow-md transition-shadow">
-        {/* Progress circle */}
-        <div className="relative shrink-0">
-          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-            <circle
-              cx="28"
-              cy="28"
-              r="24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              className="text-muted/50"
-            />
-            <circle
-              cx="28"
-              cy="28"
-              r="24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              strokeDasharray={`${(progress / 100) * 150.8} 150.8`}
-              strokeLinecap="round"
-              className="text-primary"
-            />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold">
-            {progress}%
-          </span>
-        </div>
+      <div
+        className="relative cursor-pointer group"
+        onClick={handleCardClick}
+      >
+        {/* Stacked cards effect */}
+        <div className="relative">
+          {/* Back card (shadow) */}
+          <div
+            className="absolute inset-x-1 top-1 h-full rounded-2xl border border-border/50 bg-muted/30"
+            style={{ transform: "rotate(1.5deg)" }}
+          />
+          {/* Middle card */}
+          <div
+            className="absolute inset-x-0.5 top-0.5 h-full rounded-2xl border border-border/50 bg-muted/50"
+            style={{ transform: "rotate(-0.75deg)" }}
+          />
+          {/* Front card */}
+          <div className="relative rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all">
+            <div className="p-4">
+              {/* Top row: progress circle + info */}
+              <div className="flex items-center gap-3">
+                {/* Progress circle */}
+                <div className="relative shrink-0">
+                  <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      className="text-muted/50"
+                    />
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r="20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeDasharray={`${(progress / 100) * 125.6} 125.6`}
+                      strokeLinecap="round"
+                      className="text-primary"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold">
+                    {progress}%
+                  </span>
+                </div>
 
-        {/* Deck info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground">
-            {totalCards} words
-          </p>
-          <h3 className="font-semibold text-base truncate">{deck.name}</h3>
-          <div className="flex items-center gap-1 mt-0.5">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {getLanguageName(deck.source_language)} → {getLanguageName(deck.target_language)}
-            </Badge>
-            {deck.is_public && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                Public
-              </Badge>
-            )}
+                {/* Deck info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">
+                    {totalCards} words
+                  </p>
+                  <h3 className="font-semibold text-base truncate">{deck.name}</h3>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      {getLanguageName(deck.source_language)} → {getLanguageName(deck.target_language)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Due badge */}
+                {dueCount > 0 && (
+                  <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shrink-0">
+                    {dueCount > 99 ? "99+" : dueCount}
+                  </Badge>
+                )}
+
+                {/* Play button */}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPlayModal(true);
+                  }}
+                >
+                  <Play className="h-4 w-4 ml-0.5" fill="currentColor" />
+                </Button>
+
+                {/* Menu button */}
+                <div className="relative shrink-0" ref={menuRef}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-10 h-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(!showMenu);
+                    }}
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+
+                  {/* Dropdown menu */}
+                  {showMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-card border rounded-xl shadow-lg z-20 overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          router.push(`/decks/${deck.id}`);
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Manage deck
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          router.push(`/import`);
+                        }}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Import / Export
+                      </button>
+                      {onDelete && (
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                            onDelete(deck.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete deck
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Due badge */}
-        {dueCount > 0 && (
-          <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shrink-0">
-            {dueCount > 99 ? "99+" : dueCount}
-          </Badge>
-        )}
-
-        {/* Play button */}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="shrink-0 w-12 h-12 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
-          onClick={() => setShowPlayModal(true)}
-        >
-          <Play className="h-5 w-5 ml-0.5" fill="currentColor" />
-        </Button>
-      </div>
-
-      {/* Bottom actions */}
-      <div className="flex items-center gap-2 px-4">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-10 w-10 rounded-full bg-muted/50 hover:bg-muted"
-          onClick={() => router.push(`/decks/${deck.id}`)}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-10 w-10 rounded-full bg-muted/50 hover:bg-muted"
-          onClick={() => router.push(`/import`)}
-        >
-          <Upload className="h-4 w-4" />
-        </Button>
-        {onDelete && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 rounded-full bg-muted/50 hover:bg-muted text-destructive"
-            onClick={() => onDelete(deck.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
       </div>
 
       {/* Play Modal */}
@@ -143,7 +209,7 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
               className="absolute top-3 right-3 text-muted-foreground hover:text-foreground z-10"
               onClick={() => setShowPlayModal(false)}
             >
-              <X className="h-5 w-5" />
+              ✕
             </button>
 
             <div className="divide-y">
