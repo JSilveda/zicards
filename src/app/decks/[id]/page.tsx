@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { Navbar } from "@/components/navbar";
 import { CardManager } from "@/components/card-manager";
 import { ImportExport } from "@/components/import-export";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,7 @@ export default function DeckDetailPage() {
   if (loading) {
     return (
       <AuthGuard>
+        <Navbar />
         <main className="container mx-auto px-4 py-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/3" />
@@ -142,6 +144,7 @@ export default function DeckDetailPage() {
 
   return (
     <AuthGuard>
+      <Navbar />
       <main className="container mx-auto px-4 py-4 max-w-4xl">
         {/* Row 1: Back arrow + 3-dot menu */}
         <div className="flex items-center justify-between mb-4">
