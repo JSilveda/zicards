@@ -101,6 +101,13 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-sm text-muted-foreground mb-2">Memorize this word:</p>
+            {currentCard.image_url && (
+              <img
+                src={currentCard.image_url}
+                alt={currentCard.front}
+                className="max-h-32 rounded-lg object-cover mb-4"
+              />
+            )}
             <h2 className="text-4xl font-bold mb-3">{currentCard.front}</h2>
             {currentCard.transcription && (
               <p className="text-muted-foreground mb-2">/{currentCard.transcription}/</p>

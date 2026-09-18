@@ -109,6 +109,13 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
 
       <Card className="mb-6">
         <CardContent className="flex flex-col items-center justify-center py-10">
+          {currentCard.image_url && (
+            <img
+              src={currentCard.image_url}
+              alt={currentCard.front}
+              className="max-h-32 rounded-lg object-cover mb-4"
+            />
+          )}
           <p className="text-sm text-muted-foreground mb-2">What is the translation of:</p>
           <h2 className="text-3xl font-bold mb-4">{currentCard.front}</h2>
           <Button

@@ -127,6 +127,13 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
           {showHelp ? (
             <>
               <p className="text-sm text-muted-foreground mb-2">The answer is:</p>
+              {currentCard.image_url && (
+                <img
+                  src={currentCard.image_url}
+                  alt={currentCard.front}
+                  className="max-h-28 rounded-lg object-cover mb-3"
+                />
+              )}
               <h2 className="text-3xl font-bold mb-2 text-primary">{currentCard.front}</h2>
               {currentCard.transcription && (
                 <p className="text-sm text-muted-foreground mb-2">/{currentCard.transcription}/</p>
@@ -143,6 +150,13 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
           ) : (
             <>
               <p className="text-sm text-muted-foreground mb-2">Type the translation of:</p>
+              {currentCard.image_url && (
+                <img
+                  src={currentCard.image_url}
+                  alt={currentCard.back}
+                  className="max-h-28 rounded-lg object-cover mb-3"
+                />
+              )}
               <h2 className="text-3xl font-bold mb-1">{currentCard.back}</h2>
               {currentCard.example && (
                 <p className="text-sm text-muted-foreground italic mt-2 max-w-xs">

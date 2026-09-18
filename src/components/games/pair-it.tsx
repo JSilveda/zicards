@@ -18,6 +18,7 @@ interface WordItem {
   text: string;
   cardId: string;
   side: "left" | "right";
+  image_url?: string | null;
 }
 
 export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
@@ -55,6 +56,7 @@ export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
       text: cards[idx].front,
       cardId: cards[idx].id,
       side: "left" as const,
+      image_url: cards[idx].image_url || null,
     }));
   }, [blockIndices, cards]);
 
@@ -65,6 +67,7 @@ export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
         text: cards[idx].back,
         cardId: cards[idx].id,
         side: "right" as const,
+        image_url: null,
       }))
       .sort(() => Math.random() - 0.5);
   }, [blockIndices, cards]);
@@ -165,7 +168,7 @@ export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
                 key={item.id}
                 onClick={() => handleLeftClick(item.id)}
                 disabled={isMatched}
-                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left ${
+                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left flex items-center gap-2 ${
                   isMatched
                     ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
                     : isWrong
@@ -175,6 +178,9 @@ export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
                     : "bg-card hover:bg-muted border-border"
                 }`}
               >
+                {item.image_url && (
+                  <img src={item.image_url} alt="" className="w-8 h-8 rounded object-cover shrink-0" />
+                )}
                 {isMatched ? (
                   <span className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
