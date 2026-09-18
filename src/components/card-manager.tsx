@@ -5,23 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface CardManagerProps {
   deckId: string;
   sourceLanguage: string;
   targetLanguage: string;
+  searchQuery?: string;
 }
 
 export function CardManager({
   deckId,
   sourceLanguage,
   targetLanguage,
+  searchQuery: externalSearch = "",
 }: CardManagerProps) {
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,12 @@ export function CardManager({
   useEffect(() => {
     loadCards();
   }, [loadCards]);
+
+  useEffect(() => {
+    const handler = () => openCreate();
+    document.addEventListener("open-create-card", handler);
+    return () => document.removeEventListener("open-create-card", handler);
+  }, []);
 
   const openCreate = () => {
     setEditingCard(null);
@@ -111,33 +119,39 @@ export function CardManager({
     }
   };
 
+  const filteredCards = cards.filter((card) => {
+    if (!externalSearch.trim()) return true;
+    const q = externalSearch.toLowerCase();
+    return (
+      card.front.toLowerCase().includes(q) ||
+      card.back.toLowerCase().includes(q) ||
+      (card.example && card.example.toLowerCase().includes(q))
+    );
+  });
+
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Loading cards...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Cards ({cards.length})</h3>
-        <Button onClick={openCreate} className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Card
-        </Button>
-      </div>
-
-      {cards.length === 0 ? (
-        <Card className="py-12 text-center">
-          <CardContent>
-            <p className="text-muted-foreground mb-4">No cards yet. Add your first card!</p>
-            <Button onClick={openCreate} className="gap-1">
-              <Plus className="h-4 w-4" />
-              Add Card
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {filteredCards.length === 0 ? (
+          <Card className="py-12 text-center md:col-span-2 lg:col-span-3">
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                {externalSearch ? "No cards match your search" : "No cards yet. Add your first card!"}
+              </p>
+              {!externalSearch && (
+                <Button onClick={openCreate} className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add Card
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          filteredCards.map((card) => (
             <FlashCard
               key={card.id}
               card={card}
@@ -146,9 +160,9 @@ export function CardManager({
               onEdit={openEdit}
               onDelete={handleDelete}
             />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
