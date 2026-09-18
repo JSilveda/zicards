@@ -1,21 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getLanguageName } from "@/lib/utils";
+import { GamesModal } from "@/components/games/games-modal";
 import {
   Play,
   BookOpen,
-  RotateCcw,
-  Gamepad2,
   Headphones,
   Trash2,
   Upload,
   RefreshCw,
   X,
+  Gamepad2,
 } from "lucide-react";
 import type { Deck } from "@/types";
 
@@ -25,7 +24,8 @@ interface DeckCardProps {
 }
 
 export function DeckCard({ deck, onDelete }: DeckCardProps) {
-  const [showModal, setShowModal] = useState(false);
+  const [showPlayModal, setShowPlayModal] = useState(false);
+  const [showGamesModal, setShowGamesModal] = useState(false);
   const router = useRouter();
 
   const totalCards = deck.card_count || 0;
@@ -95,7 +95,7 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
           size="icon"
           variant="ghost"
           className="shrink-0 w-12 h-12 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowPlayModal(true)}
         >
           <Play className="h-5 w-5 ml-0.5" fill="currentColor" />
         </Button>
@@ -132,28 +132,26 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
       </div>
 
       {/* Play Modal */}
-      {showModal && (
+      {showPlayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowModal(false)}
+            onClick={() => setShowPlayModal(false)}
           />
           <div className="relative bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95">
-            {/* Close button */}
             <button
               className="absolute top-3 right-3 text-muted-foreground hover:text-foreground z-10"
-              onClick={() => setShowModal(false)}
+              onClick={() => setShowPlayModal(false)}
             >
               <X className="h-5 w-5" />
             </button>
 
-            {/* Options */}
             <div className="divide-y">
               {/* Learn */}
               <button
                 className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
                 onClick={() => {
-                  setShowModal(false);
+                  setShowPlayModal(false);
                   router.push(`/decks/${deck.id}/study?mode=learn`);
                 }}
               >
@@ -172,7 +170,7 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
               <button
                 className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
                 onClick={() => {
-                  setShowModal(false);
+                  setShowPlayModal(false);
                   router.push(`/decks/${deck.id}/study?mode=review`);
                 }}
               >
@@ -191,8 +189,8 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
               <button
                 className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
                 onClick={() => {
-                  setShowModal(false);
-                  router.push(`/decks/${deck.id}/study?mode=game`);
+                  setShowPlayModal(false);
+                  setShowGamesModal(true);
                 }}
               >
                 <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
@@ -210,7 +208,7 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
               <button
                 className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
                 onClick={() => {
-                  setShowModal(false);
+                  setShowPlayModal(false);
                   router.push(`/decks/${deck.id}/study?mode=autoplay`);
                 }}
               >
@@ -228,6 +226,16 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
           </div>
         </div>
       )}
+
+      {/* Games Modal */}
+      <GamesModal
+        open={showGamesModal}
+        onClose={() => setShowGamesModal(false)}
+        onSelect={(game) => {
+          setShowGamesModal(false);
+          router.push(`/decks/${deck.id}/study?mode=game&game=${game}`);
+        }}
+      />
     </>
   );
 }

@@ -1,0 +1,143 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Trophy, RotateCcw, CheckCircle, XCircle, Volume2 } from "lucide-react";
+import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import type { Card as CardType } from "@/types";
+
+interface GuessItProps {
+  cards: CardType[];
+  sourceLanguage: string;
+  targetLanguage: string;
+  onComplete: () => void;
+}
+
+export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: GuessItProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [options, setOptions] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+
+  const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+  const currentCard = shuffledCards[currentIndex];
+
+  useEffect(() => {
+    if (!currentCard) return;
+    const wrongOptions = shuffledCards
+      .filter((c) => c.id !== currentCard.id)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3)
+      .map((c) => c.back);
+    const allOptions = [...wrongOptions, currentCard.back].sort(() => Math.random() - 0.5);
+    setOptions(allOptions);
+    setSelected(null);
+    setIsCorrect(null);
+  }, [currentIndex, currentCard, shuffledCards]);
+
+  useEffect(() => {
+    if (currentCard) {
+      speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
+    }
+  }, [currentIndex, currentCard, sourceLanguage]);
+
+  const handleSelect = (option: string) => {
+    if (selected) return;
+    setSelected(option);
+    const correct = option === currentCard.back;
+    setIsCorrect(correct);
+    if (correct) {
+      setScore((s) => s + 10 + streak * 2);
+      setStreak((s) => s + 1);
+    } else {
+      setStreak(0);
+    }
+
+    setTimeout(() => {
+      if (currentIndex + 1 >= shuffledCards.length) {
+        setIsComplete(true);
+      } else {
+        setCurrentIndex((i) => i + 1);
+      }
+    }, 1200);
+  };
+
+  if (isComplete || !currentCard) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+        <Trophy className="h-16 w-16 text-yellow-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Game Over!</h2>
+        <p className="text-muted-foreground mb-2">Score: {score} points</p>
+        <p className="text-sm text-muted-foreground mb-6">
+          Best streak: {streak > 0 ? streak : "N/A"}
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={onComplete} className="gap-2">
+            <RotateCcw className="h-4 w-4" />
+            Play Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <Badge variant="outline">
+          {currentIndex + 1}/{shuffledCards.length}
+        </Badge>
+        <div className="flex gap-2">
+          <Badge variant="secondary">{score} pts</Badge>
+          {streak > 1 && (
+            <Badge className="bg-orange-500">🔥 {streak}</Badge>
+          )}
+        </div>
+      </div>
+
+      <Card className="mb-6">
+        <CardContent className="flex flex-col items-center justify-center py-10">
+          <p className="text-sm text-muted-foreground mb-2">What is the translation of:</p>
+          <h2 className="text-3xl font-bold mb-4">{currentCard.front}</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
+          >
+            <Volume2 className="h-4 w-4 mr-1" />
+            Listen
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3">
+        {options.map((option) => {
+          let style = "bg-card hover:bg-muted border-border";
+          if (selected) {
+            if (option === currentCard.back) {
+              style = "bg-green-100 dark:bg-green-900/30 border-green-500";
+            } else if (option === selected && !isCorrect) {
+              style = "bg-red-100 dark:bg-red-900/30 border-red-500";
+            }
+          }
+
+          return (
+            <button
+              key={option}
+              onClick={() => handleSelect(option)}
+              disabled={!!selected}
+              className={`p-4 rounded-xl border-2 font-medium transition-all ${style}`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
