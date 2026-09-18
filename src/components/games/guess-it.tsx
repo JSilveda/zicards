@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, RotateCcw, CheckCircle, XCircle, Volume2 } from "lucide-react";
+import { Trophy, RotateCcw, Volume2 } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import type { Card as CardType } from "@/types";
 
@@ -17,28 +17,24 @@ interface GuessItProps {
 
 export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: GuessItProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [options, setOptions] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
-  const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+  const shuffledCards = useMemo(() => [...cards].sort(() => Math.random() - 0.5), [cards]);
   const currentCard = shuffledCards[currentIndex];
 
-  useEffect(() => {
-    if (!currentCard) return;
+  const options = useMemo(() => {
+    if (!currentCard) return [];
     const wrongOptions = shuffledCards
       .filter((c) => c.id !== currentCard.id)
       .sort(() => Math.random() - 0.5)
       .slice(0, 3)
       .map((c) => c.back);
-    const allOptions = [...wrongOptions, currentCard.back].sort(() => Math.random() - 0.5);
-    setOptions(allOptions);
-    setSelected(null);
-    setIsCorrect(null);
-  }, [currentIndex, currentCard, shuffledCards]);
+    return [...wrongOptions, currentCard.back].sort(() => Math.random() - 0.5);
+  }, [currentCard, shuffledCards]);
 
   useEffect(() => {
     if (currentCard) {
@@ -63,6 +59,8 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: G
         setIsComplete(true);
       } else {
         setCurrentIndex((i) => i + 1);
+        setSelected(null);
+        setIsCorrect(null);
       }
     }, 1200);
   };
@@ -128,7 +126,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: G
 
           return (
             <button
-              key={option}
+              key={`${currentIndex}-${option}`}
               onClick={() => handleSelect(option)}
               disabled={!!selected}
               className={`p-4 rounded-xl border-2 font-medium transition-all ${style}`}
