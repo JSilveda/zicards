@@ -182,6 +182,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
         <Card className="min-h-[300px] flex flex-col items-center justify-center p-8">
           <CardContent className="text-center p-0">
+            {currentCard.image_url && (
+              <img
+                src={currentCard.image_url}
+                alt={currentCard.front}
+                className="max-h-36 rounded-lg object-cover mx-auto mb-4"
+              />
+            )}
             <p className="text-sm text-muted-foreground mb-2">Front</p>
             <h2 className="text-4xl font-bold mb-4">{currentCard.front}</h2>
             <div className="h-px bg-border w-32 mx-auto my-4" />
@@ -258,6 +265,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               <p className="text-sm text-muted-foreground mb-4">
                 Tap to reveal answer
               </p>
+              {currentCard.image_url && (
+                <img
+                  src={currentCard.image_url}
+                  alt={currentCard.front}
+                  className="max-h-36 rounded-lg object-cover mx-auto mb-4"
+                />
+              )}
               <h2 className="text-4xl font-bold mb-3">{currentCard.front}</h2>
               {currentCard.transcription && (
                 <p className="text-muted-foreground mb-2">
@@ -289,6 +303,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
             <CardContent className="text-center p-0">
+              {currentCard.image_url && (
+                <img
+                  src={currentCard.image_url}
+                  alt={currentCard.back}
+                  className="max-h-36 rounded-lg object-cover mx-auto mb-4"
+                />
+              )}
               <h2 className="text-4xl font-bold mb-3">{currentCard.back}</h2>
               {currentCard.example && (
                 <p className="text-muted-foreground italic mb-4 max-w-sm">
