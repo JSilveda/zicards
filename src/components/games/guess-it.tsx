@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Trophy, RotateCcw, Volume2 } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import type { Card as CardType } from "@/types";
@@ -14,9 +13,10 @@ interface GuessItProps {
   sourceLanguage: string;
   targetLanguage: string;
   onComplete: () => void;
+  onProgress?: (progress: number) => void;
 }
 
-export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: GuessItProps) {
+export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: GuessItProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -89,9 +89,13 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: G
     ? ((currentIndex + 1) / shuffledCards.length) * 100
     : 0;
 
+  useEffect(() => {
+    onProgress?.(progress);
+  }, [progress, onProgress]);
+
   return (
     <div className="max-w-lg mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-6">
         <Badge variant="outline">
           {currentIndex + 1}/{shuffledCards.length}
         </Badge>
@@ -102,8 +106,6 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete }: G
           )}
         </div>
       </div>
-
-      <Progress value={progress} className="mb-6" />
 
       <Card className="mb-6">
         <CardContent className="flex flex-col items-center justify-center py-10">

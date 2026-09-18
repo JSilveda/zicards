@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { Navbar } from "@/components/navbar";
+import { StudyHeader } from "@/components/study-header";
 import { StudySession } from "@/components/study-session";
 import { PairIt } from "@/components/games/pair-it";
 import { GuessIt } from "@/components/games/guess-it";
@@ -13,11 +12,22 @@ import { TypeIt } from "@/components/games/type-it";
 import { getDeck } from "@/lib/queries/decks";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
-import { ArrowLeft } from "lucide-react";
 import type { Deck } from "@/types";
 import type { Card as CardType } from "@/types";
 
 const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
+import dynamic from "next/dynamic";
+
+const activityTitles: Record<string, string> = {
+  learn: "Learn",
+  review: "Review words",
+  game: "Game",
+  autoplay: "Autoplay",
+  "pair-it": "Pair It",
+  "guess-it": "Guess It",
+  "recall-it": "Recall It",
+  "type-it": "Type It",
+};
 
 export default function StudyPage() {
   const params = useParams();
@@ -30,6 +40,7 @@ export default function StudyPage() {
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [studyProgress, setStudyProgress] = useState(0);
 
   const loadDeck = useCallback(async () => {
     try {
@@ -54,12 +65,23 @@ export default function StudyPage() {
     loadDeck();
   }, [loadDeck]);
 
-  const handleGameComplete = () => {
+  const handleComplete = () => {
     loadDeck();
+  };
+
+  const handleBack = () => {
+    router.push(`/decks/${deckId}`);
   };
 
   if (loading) return <LoadingPage />;
   if (!deck) return null;
+
+  const getActivityTitle = () => {
+    if (mode === "game" && game) {
+      return activityTitles[game] || "Game";
+    }
+    return activityTitles[mode] || "Study";
+  };
 
   const renderContent = () => {
     if (mode === "game" && game) {
@@ -67,14 +89,21 @@ export default function StudyPage() {
 
       switch (game) {
         case "pair-it":
-          return <PairIt cards={gameCards} onComplete={handleGameComplete} />;
+          return (
+            <PairIt
+              cards={gameCards}
+              onComplete={handleComplete}
+              onProgress={setStudyProgress}
+            />
+          );
         case "guess-it":
           return (
             <GuessIt
               cards={gameCards}
               sourceLanguage={deck.source_language}
               targetLanguage={deck.target_language}
-              onComplete={handleGameComplete}
+              onComplete={handleComplete}
+              onProgress={setStudyProgress}
             />
           );
         case "recall-it":
@@ -83,7 +112,8 @@ export default function StudyPage() {
               cards={gameCards}
               sourceLanguage={deck.source_language}
               targetLanguage={deck.target_language}
-              onComplete={handleGameComplete}
+              onComplete={handleComplete}
+              onProgress={setStudyProgress}
             />
           );
         case "type-it":
@@ -92,42 +122,43 @@ export default function StudyPage() {
               cards={gameCards}
               sourceLanguage={deck.source_language}
               targetLanguage={deck.target_language}
-              onComplete={handleGameComplete}
+              onComplete={handleComplete}
+              onProgress={setStudyProgress}
             />
           );
         default:
-          return <StudySession deck={deck} mode={mode as "learn" | "review" | "game" | "autoplay"} />;
+          return (
+            <StudySession
+              deck={deck}
+              mode={mode as "learn" | "review" | "game" | "autoplay"}
+              onProgress={setStudyProgress}
+            />
+          );
       }
     }
 
-    return <StudySession deck={deck} mode={mode as "learn" | "review" | "game" | "autoplay"} />;
+    return (
+      <StudySession
+        deck={deck}
+        mode={mode as "learn" | "review" | "game" | "autoplay"}
+        onProgress={setStudyProgress}
+      />
+    );
   };
 
   return (
     <AuthGuard>
-      <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <Link
-          href={`/decks/${deckId}`}
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to {deck.name}
-        </Link>
-
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          {mode === "learn" && "Learning"}
-          {mode === "review" && "Reviewing"}
-          {mode === "game" && game === "pair-it" && "Pair It"}
-          {mode === "game" && game === "guess-it" && "Guess It"}
-          {mode === "game" && game === "recall-it" && "Recall It"}
-          {mode === "game" && game === "type-it" && "Type It"}
-          {mode === "autoplay" && "Autoplay"}
-          : {deck.name}
-        </h1>
-
-        {renderContent()}
-      </main>
+      <div className="min-h-screen flex flex-col">
+        <StudyHeader
+          activityTitle={getActivityTitle()}
+          deckName={deck.name}
+          progress={studyProgress}
+          onBack={handleBack}
+        />
+        <main className="flex-1 container mx-auto px-4 py-6">
+          {renderContent()}
+        </main>
+      </div>
     </AuthGuard>
   );
 }

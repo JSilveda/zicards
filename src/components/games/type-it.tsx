@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Trophy, RotateCcw, Volume2, CheckCircle, XCircle, Eye } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import type { Card as CardType } from "@/types";
@@ -15,9 +14,10 @@ interface TypeItProps {
   sourceLanguage: string;
   targetLanguage: string;
   onComplete: () => void;
+  onProgress?: (progress: number) => void;
 }
 
-export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: TypeItProps) {
+export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: TypeItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [input, setInput] = useState("");
@@ -31,6 +31,10 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: Ty
 
   const currentCard = queue[currentIndex];
   const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
+
+  useEffect(() => {
+    onProgress?.(progress);
+  }, [progress, onProgress]);
 
   useEffect(() => {
     if (currentCard && !showHelp) {
@@ -111,14 +115,12 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: Ty
 
   return (
     <div className="max-w-lg mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-6">
         <Badge variant="outline">
           {currentIndex + 1}/{queue.length}
         </Badge>
         <Badge variant="secondary">{score} pts</Badge>
       </div>
-
-      <Progress value={progress} className="mb-6" />
 
       <Card className="mb-6">
         <CardContent className="flex flex-col items-center justify-center py-10">

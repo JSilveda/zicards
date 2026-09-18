@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { submitReview, getDueCards } from "@/lib/queries/reviews";
@@ -15,9 +14,10 @@ import type { Card as CardType, Deck } from "@/types";
 interface StudySessionProps {
   deck: Deck;
   mode?: "learn" | "review" | "game" | "autoplay";
+  onProgress?: (progress: number) => void;
 }
 
-export function StudySession({ deck, mode = "review" }: StudySessionProps) {
+export function StudySession({ deck, mode = "review", onProgress }: StudySessionProps) {
   const [cards, setCards] = useState<CardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -57,6 +57,11 @@ export function StudySession({ deck, mode = "review" }: StudySessionProps) {
   useEffect(() => {
     loadCards();
   }, [loadCards]);
+
+  useEffect(() => {
+    const progress = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
+    onProgress?.(progress);
+  }, [currentIndex, cards.length, onProgress]);
 
   useEffect(() => {
     if (mode === "autoplay" && cards.length > 0 && isPlaying) {
@@ -173,7 +178,6 @@ export function StudySession({ deck, mode = "review" }: StudySessionProps) {
               {currentIndex + 1} / {cards.length}
             </Badge>
           </div>
-          <Progress value={progress} />
         </div>
 
         <Card className="min-h-[300px] flex flex-col items-center justify-center p-8">
@@ -231,7 +235,6 @@ export function StudySession({ deck, mode = "review" }: StudySessionProps) {
             </Badge>
           </div>
         </div>
-        <Progress value={progress} />
       </div>
 
       <div

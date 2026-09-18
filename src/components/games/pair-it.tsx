@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Trophy, RotateCcw, CheckCircle } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface PairItProps {
   cards: CardType[];
   onComplete: () => void;
+  onProgress?: (progress: number) => void;
 }
 
 interface WordItem {
@@ -20,7 +20,7 @@ interface WordItem {
   side: "left" | "right";
 }
 
-export function PairIt({ cards, onComplete }: PairItProps) {
+export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
   const totalPairs = cards.length;
 
   const [usedIndices, setUsedIndices] = useState<Set<number>>(new Set());
@@ -70,6 +70,10 @@ export function PairIt({ cards, onComplete }: PairItProps) {
   }, [blockIndices, cards]);
 
   const progress = totalPairs > 0 ? (totalMatched / totalPairs) * 100 : 0;
+
+  useEffect(() => {
+    onProgress?.(progress);
+  }, [progress, onProgress]);
 
   const checkMatch = useCallback(
     (leftId: string, rightId: string) => {
@@ -147,8 +151,6 @@ export function PairIt({ cards, onComplete }: PairItProps) {
         </Badge>
         <Badge variant="secondary">{score} pts</Badge>
       </div>
-
-      <Progress value={progress} className="mb-6" />
 
       <div className="grid grid-cols-2 gap-6">
         {/* Left column */}

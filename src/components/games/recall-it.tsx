@@ -13,9 +13,10 @@ interface RecallItProps {
   sourceLanguage: string;
   targetLanguage: string;
   onComplete: () => void;
+  onProgress?: (progress: number) => void;
 }
 
-export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete }: RecallItProps) {
+export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: RecallItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [phase, setPhase] = useState<"memorize" | "recall">("memorize");
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -32,6 +33,11 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete }: 
       speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
     }
   }, [currentIndex, currentCard, phase, sourceLanguage]);
+
+  useEffect(() => {
+    const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
+    onProgress?.(progress);
+  }, [currentIndex, queue.length, onProgress]);
 
   const handleMemorizeDone = () => {
     setPhase("recall");
