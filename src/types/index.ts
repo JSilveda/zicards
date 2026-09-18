@@ -15,6 +15,9 @@ export interface Deck {
   created_at: string;
   updated_at: string;
   card_count?: number;
+  learned_count?: number;
+  due_count?: number;
+  progress_percent?: number;
 }
 
 export interface Card {

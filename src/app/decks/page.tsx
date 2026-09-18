@@ -5,13 +5,13 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/navbar";
 import { DeckCard } from "@/components/deck-card";
-
-const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getDecks, deleteDeck } from "@/lib/queries/decks";
 import { Plus, Search, Layers } from "lucide-react";
 import type { Deck } from "@/types";
+
+const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
 
 export default function DecksPage() {
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -52,8 +52,8 @@ export default function DecksPage() {
   return (
     <AuthGuard>
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold">My Decks</h1>
             <p className="text-muted-foreground">
@@ -79,9 +79,9 @@ export default function DecksPage() {
         </div>
 
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+              <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -105,7 +105,7 @@ export default function DecksPage() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {filtered.map((deck) => (
               <DeckCard key={deck.id} deck={deck} onDelete={handleDelete} />
             ))}

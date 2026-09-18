@@ -1,22 +1,24 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/navbar";
 import { StudySession } from "@/components/study-session";
-
-const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
 import { getDeck } from "@/lib/queries/decks";
 import { ArrowLeft } from "lucide-react";
 import type { Deck } from "@/types";
 import { LoadingPage } from "@/components/ui/loading";
 
+const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
+
 export default function StudyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const deckId = params.id as string;
+  const mode = (searchParams.get("mode") as "learn" | "review" | "game" | "autoplay") || "review";
   const [deck, setDeck] = useState<Deck | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,10 +57,14 @@ export default function StudyPage() {
         </Link>
 
         <h1 className="text-2xl font-bold mb-6 text-center">
-          Studying: {deck.name}
+          {mode === "learn" && "Learning"}
+          {mode === "review" && "Reviewing"}
+          {mode === "game" && "Game Mode"}
+          {mode === "autoplay" && "Autoplay"}
+          : {deck.name}
         </h1>
 
-        <StudySession deck={deck} />
+        <StudySession deck={deck} mode={mode} />
       </main>
     </AuthGuard>
   );

@@ -7,15 +7,17 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { submitReview, getDueCards } from "@/lib/queries/reviews";
+import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
-import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw } from "lucide-react";
+import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play } from "lucide-react";
 import type { Card as CardType, Deck } from "@/types";
 
 interface StudySessionProps {
   deck: Deck;
+  mode?: "learn" | "review" | "game" | "autoplay";
 }
 
-export function StudySession({ deck }: StudySessionProps) {
+export function StudySession({ deck, mode = "review" }: StudySessionProps) {
   const [cards, setCards] = useState<CardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -24,11 +26,22 @@ export function StudySession({ deck }: StudySessionProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const loadCards = useCallback(async () => {
     try {
-      const dueCards = await getDueCards(deck.id);
-      setCards(dueCards);
+      if (mode === "review") {
+        const dueCards = await getDueCards(deck.id);
+        setCards(dueCards);
+      } else {
+        const allCards = await getCards(deck.id);
+        if (mode === "learn") {
+          const newCards = allCards.filter((c) => !c.id);
+          setCards(newCards.length > 0 ? newCards : allCards.slice(0, 20));
+        } else {
+          setCards(allCards);
+        }
+      }
       setCurrentIndex(0);
       setCorrectCount(0);
       setIncorrectCount(0);
@@ -39,11 +52,35 @@ export function StudySession({ deck }: StudySessionProps) {
     } finally {
       setLoading(false);
     }
-  }, [deck.id]);
+  }, [deck.id, mode]);
 
   useEffect(() => {
     loadCards();
   }, [loadCards]);
+
+  useEffect(() => {
+    if (mode === "autoplay" && cards.length > 0 && isPlaying) {
+      const timer = setInterval(() => {
+        setCurrentIndex((prev) => {
+          if (prev >= cards.length - 1) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 3000);
+      return () => clearInterval(timer);
+    }
+  }, [mode, cards.length, isPlaying, currentIndex]);
+
+  useEffect(() => {
+    if (mode === "autoplay" && cards.length > 0 && isPlaying) {
+      const card = cards[currentIndex];
+      const lang = currentIndex % 2 === 0 ? deck.source_language : deck.target_language;
+      const text = currentIndex % 2 === 0 ? card.front : card.back;
+      speak(text, getLanguageVoiceCode(lang));
+    }
+  }, [currentIndex, mode, cards, isPlaying, deck]);
 
   const handleAnswer = async (correct: boolean) => {
     if (submitting) return;
@@ -66,6 +103,14 @@ export function StudySession({ deck }: StudySessionProps) {
       console.error("Failed to submit review:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleFlipAndSpeak = () => {
+    setFlipped(!flipped);
+    if (!flipped) {
+      const lang = deck.target_language;
+      speak(cards[currentIndex].back, getLanguageVoiceCode(lang));
     }
   };
 
@@ -119,6 +164,57 @@ export function StudySession({ deck }: StudySessionProps) {
   const currentCard = cards[currentIndex];
   const progress = ((currentIndex + 1) / cards.length) * 100;
 
+  if (mode === "autoplay") {
+    return (
+      <div className="max-w-2xl mx-auto p-4">
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <Badge variant="outline">
+              {currentIndex + 1} / {cards.length}
+            </Badge>
+          </div>
+          <Progress value={progress} />
+        </div>
+
+        <Card className="min-h-[300px] flex flex-col items-center justify-center p-8">
+          <CardContent className="text-center p-0">
+            <p className="text-sm text-muted-foreground mb-2">Front</p>
+            <h2 className="text-4xl font-bold mb-4">{currentCard.front}</h2>
+            <div className="h-px bg-border w-32 mx-auto my-4" />
+            <p className="text-sm text-muted-foreground mb-2">Back</p>
+            <h2 className="text-3xl font-bold text-primary">{currentCard.back}</h2>
+            {currentCard.example && (
+              <p className="text-sm text-muted-foreground italic mt-4 max-w-sm mx-auto">
+                &quot;{currentCard.example}&quot;
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-center mt-6 gap-4">
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setIsPlaying(!isPlaying)}
+          >
+            {isPlaying ? (
+              <>
+                <Pause className="h-5 w-5" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="h-5 w-5" />
+                Play
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-4">
       <div className="mb-6">
@@ -140,7 +236,7 @@ export function StudySession({ deck }: StudySessionProps) {
 
       <div
         className="cursor-pointer mb-6"
-        onClick={() => setFlipped(!flipped)}
+        onClick={handleFlipAndSpeak}
         style={{ perspective: "1000px" }}
       >
         <div
