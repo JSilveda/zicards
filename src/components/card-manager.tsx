@@ -8,8 +8,9 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
+import { ImageSearchModal } from "@/components/image-search-modal";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
-import { Plus } from "lucide-react";
+import { Plus, Image } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface CardManagerProps {
@@ -37,6 +38,7 @@ export function CardManager({
     gender: "",
     image_url: "",
   });
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
 
   const loadCards = useCallback(async () => {
     try {
@@ -220,12 +222,42 @@ export function CardManager({
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium">Image URL</label>
-              <Input
-                value={form.image_url}
-                onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                placeholder="https://..."
-              />
+              <label className="text-sm font-medium">Image</label>
+              <div className="flex gap-2">
+                <Input
+                  value={form.image_url}
+                  onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                  placeholder="Image URL or search with AI"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setImageSearchOpen(true)}
+                  title="Search images"
+                >
+                  <Image className="h-4 w-4" />
+                </Button>
+              </div>
+              {form.image_url && (
+                <div className="mt-2 relative inline-block">
+                  <img
+                    src={form.image_url}
+                    alt="Preview"
+                    className="h-20 rounded-lg object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  <button
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center"
+                    onClick={() => setForm({ ...form, image_url: "" })}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -238,6 +270,13 @@ export function CardManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageSearchModal
+        open={imageSearchOpen}
+        onClose={() => setImageSearchOpen(false)}
+        onSelect={(url) => setForm({ ...form, image_url: url })}
+        initialQuery={form.front}
+      />
     </div>
   );
 }
