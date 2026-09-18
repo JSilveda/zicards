@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, RotateCcw } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Trophy, RotateCcw, CheckCircle } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface PairItProps {
@@ -12,47 +13,115 @@ interface PairItProps {
   onComplete: () => void;
 }
 
-export function PairIt({ cards, onComplete }: PairItProps) {
-  const [pairs] = useState(() => {
-    const shuffled = [...cards].sort(() => Math.random() - 0.5).slice(0, 6);
-    const items: { id: string; text: string; pairId: string; type: "front" | "back" }[] = [];
-    shuffled.forEach((card) => {
-      items.push({ id: `f-${card.id}`, text: card.front, pairId: card.id, type: "front" });
-      items.push({ id: `b-${card.id}`, text: card.back, pairId: card.id, type: "back" });
-    });
-    return items.sort(() => Math.random() - 0.5);
-  });
+interface WordItem {
+  id: string;
+  text: string;
+  cardId: string;
+  side: "left" | "right";
+}
 
-  const [selected, setSelected] = useState<string[]>([]);
+export function PairIt({ cards, onComplete }: PairItProps) {
+  const totalPairs = cards.length;
+
+  const [usedIndices, setUsedIndices] = useState<Set<number>>(new Set());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
+  const [selectedRight, setSelectedRight] = useState<string | null>(null);
   const [matched, setMatched] = useState<Set<string>>(new Set());
-  const [wrong, setWrong] = useState<string[]>([]);
+  const [wrongPair, setWrongPair] = useState<[string, string] | null>(null);
   const [score, setScore] = useState(0);
+  const [totalMatched, setTotalMatched] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
-  const handleSelect = useCallback((item: { id: string; pairId: string }) => {
-    if (selected.includes(item.id) || matched.has(item.pairId)) return;
+  const BLOCK_SIZE = 5;
 
-    const newSelected = [...selected, item.id];
-    setSelected(newSelected);
-
-    if (newSelected.length === 2) {
-      const [first, second] = newSelected;
-      const firstItem = pairs.find((p) => p.id === first);
-      const secondItem = pairs.find((p) => p.id === second);
-
-      if (firstItem && secondItem && firstItem.pairId === secondItem.pairId) {
-        setMatched((prev) => new Set([...prev, firstItem.pairId]));
-        setScore((s) => s + 10);
-        setSelected([]);
-      } else {
-        setWrong(newSelected);
-        setTimeout(() => {
-          setWrong([]);
-          setSelected([]);
-        }, 800);
+  const getBlockCards = useCallback(() => {
+    const available: number[] = [];
+    for (let i = 0; i < totalPairs; i++) {
+      if (!usedIndices.has(i)) {
+        available.push(i);
       }
     }
-  }, [selected, matched, pairs]);
+
+    const shuffled = available.sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, BLOCK_SIZE);
+  }, [usedIndices, totalPairs]);
+
+  const blockIndices = useMemo(() => getBlockCards(), [getBlockCards]);
+
+  const leftItems: WordItem[] = useMemo(() => {
+    return blockIndices.map((idx) => ({
+      id: `l-${idx}`,
+      text: cards[idx].front,
+      cardId: cards[idx].id,
+      side: "left" as const,
+    }));
+  }, [blockIndices, cards]);
+
+  const rightItems: WordItem[] = useMemo(() => {
+    return blockIndices
+      .map((idx) => ({
+        id: `r-${idx}`,
+        text: cards[idx].back,
+        cardId: cards[idx].id,
+        side: "right" as const,
+      }))
+      .sort(() => Math.random() - 0.5);
+  }, [blockIndices, cards]);
+
+  const progress = totalPairs > 0 ? (totalMatched / totalPairs) * 100 : 0;
+
+  const checkMatch = useCallback(
+    (leftId: string, rightId: string) => {
+      const leftItem = leftItems.find((l) => l.id === leftId);
+      const rightItem = rightItems.find((r) => r.id === rightId);
+
+      if (!leftItem || !rightItem) return;
+
+      if (leftItem.cardId === rightItem.cardId) {
+        setMatched((prev) => new Set([...prev, leftId, rightId]));
+        setScore((s) => s + 10);
+        setTotalMatched((t) => t + 1);
+
+        const newUsedIndices = new Set(usedIndices);
+        const cardIndex = cards.findIndex((c) => c.id === leftItem.cardId);
+        newUsedIndices.add(cardIndex);
+        setUsedIndices(newUsedIndices);
+
+        setSelectedLeft(null);
+        setSelectedRight(null);
+
+        const newTotalMatched = totalMatched + 1;
+        if (newTotalMatched >= totalPairs) {
+          setTimeout(() => setIsComplete(true), 500);
+        }
+      } else {
+        setWrongPair([leftId, rightId]);
+        setTimeout(() => {
+          setWrongPair(null);
+          setSelectedLeft(null);
+          setSelectedRight(null);
+        }, 800);
+      }
+    },
+    [leftItems, rightItems, usedIndices, cards, totalMatched, totalPairs]
+  );
+
+  const handleLeftClick = (id: string) => {
+    if (matched.has(id) || wrongPair?.includes(id)) return;
+    setSelectedLeft(id);
+    if (selectedRight) {
+      checkMatch(id, selectedRight);
+    }
+  };
+
+  const handleRightClick = (id: string) => {
+    if (matched.has(id) || wrongPair?.includes(id)) return;
+    setSelectedRight(id);
+    if (selectedLeft) {
+      checkMatch(selectedLeft, id);
+    }
+  };
 
   if (isComplete) {
     return (
@@ -70,42 +139,92 @@ export function PairIt({ cards, onComplete }: PairItProps) {
     );
   }
 
-  const matchedCount = matched.size;
-  const totalPairs = cards.length;
-
   return (
-    <div className="max-w-lg mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <Badge variant="outline">{matchedCount}/{totalPairs} pairs</Badge>
+    <div className="max-w-2xl mx-auto p-4">
+      <div className="flex justify-between items-center mb-4">
+        <Badge variant="outline">
+          {totalMatched}/{totalPairs} matched
+        </Badge>
         <Badge variant="secondary">{score} pts</Badge>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {pairs.map((item) => {
-          const isMatched = matched.has(item.pairId);
-          const isSelected = selected.includes(item.id);
-          const isWrong = wrong.includes(item.id);
+      <Progress value={progress} className="mb-6" />
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleSelect(item)}
-              disabled={isMatched}
-              className={`h-24 rounded-xl border-2 text-sm font-medium p-2 transition-all ${
-                isMatched
-                  ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
-                  : isWrong
-                  ? "bg-red-100 dark:bg-red-900/30 border-red-500 animate-pulse"
-                  : isSelected
-                  ? "bg-primary/10 border-primary"
-                  : "bg-card hover:bg-muted border-border"
-              }`}
-            >
-              <span className="line-clamp-3">{item.text}</span>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Left column */}
+        <div className="space-y-3">
+          {leftItems.map((item) => {
+            const isMatched = matched.has(item.id);
+            const isSelected = selectedLeft === item.id;
+            const isWrong = wrongPair?.includes(item.id);
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleLeftClick(item.id)}
+                disabled={isMatched}
+                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left ${
+                  isMatched
+                    ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
+                    : isWrong
+                    ? "bg-red-100 dark:bg-red-900/30 border-red-500 animate-pulse"
+                    : isSelected
+                    ? "bg-primary/10 border-primary"
+                    : "bg-card hover:bg-muted border-border"
+                }`}
+              >
+                {isMatched ? (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    {item.text}
+                  </span>
+                ) : (
+                  item.text
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-3">
+          {rightItems.map((item) => {
+            const isMatched = matched.has(item.id);
+            const isSelected = selectedRight === item.id;
+            const isWrong = wrongPair?.includes(item.id);
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleRightClick(item.id)}
+                disabled={isMatched}
+                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left ${
+                  isMatched
+                    ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
+                    : isWrong
+                    ? "bg-red-100 dark:bg-red-900/30 border-red-500 animate-pulse"
+                    : isSelected
+                    ? "bg-primary/10 border-primary"
+                    : "bg-card hover:bg-muted border-border"
+                }`}
+              >
+                {isMatched ? (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    {item.text}
+                  </span>
+                ) : (
+                  item.text
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        Select one word from each column to match them
+      </p>
     </div>
   );
 }
