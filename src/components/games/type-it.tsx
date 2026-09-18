@@ -5,7 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, RotateCcw, Volume2, CheckCircle, XCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Trophy, RotateCcw, Volume2, CheckCircle, XCircle, Eye } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import type { Card as CardType } from "@/types";
 
@@ -21,28 +22,28 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: Ty
   const [currentIndex, setCurrentIndex] = useState(0);
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
-  const [showHint, setShowHint] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const currentCard = queue[currentIndex];
+  const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
 
   useEffect(() => {
-    if (currentCard) {
-      speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
+    if (currentCard && !showHelp) {
       inputRef.current?.focus();
     }
-  }, [currentIndex, currentCard, sourceLanguage]);
+  }, [currentIndex, currentCard, showHelp]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || feedback) return;
 
     const userAnswer = input.trim().toLowerCase();
-    const correctAnswer = currentCard.back.toLowerCase();
+    const correctAnswer = currentCard.front.toLowerCase();
 
     if (userAnswer === correctAnswer) {
       setFeedback("correct");
@@ -54,15 +55,31 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: Ty
     }
 
     setTimeout(() => {
-      if (currentIndex + 1 >= queue.length) {
-        setIsComplete(true);
-      } else {
-        setCurrentIndex((i) => i + 1);
-        setInput("");
-        setFeedback(null);
-        setShowHint(false);
-      }
+      goToNext();
     }, 1500);
+  };
+
+  const goToNext = () => {
+    if (currentIndex + 1 >= queue.length) {
+      setIsComplete(true);
+    } else {
+      setCurrentIndex((i) => i + 1);
+      setInput("");
+      setFeedback(null);
+      setShowHelp(false);
+    }
+  };
+
+  const handleHelp = () => {
+    setShowHelp(true);
+    speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
+  };
+
+  const handleTryAgain = () => {
+    setShowHelp(false);
+    setInput("");
+    setFeedback(null);
+    inputRef.current?.focus();
   };
 
   if (isComplete || !currentCard) {
@@ -94,84 +111,111 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete }: Ty
 
   return (
     <div className="max-w-lg mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <Badge variant="outline">
           {currentIndex + 1}/{queue.length}
         </Badge>
         <Badge variant="secondary">{score} pts</Badge>
       </div>
 
+      <Progress value={progress} className="mb-6" />
+
       <Card className="mb-6">
         <CardContent className="flex flex-col items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground mb-2">Type the translation of:</p>
-          <h2 className="text-3xl font-bold mb-3">{currentCard.front}</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
-          >
-            <Volume2 className="h-4 w-4 mr-1" />
-            Listen
-          </Button>
+          {showHelp ? (
+            <>
+              <p className="text-sm text-muted-foreground mb-2">The answer is:</p>
+              <h2 className="text-3xl font-bold mb-2 text-primary">{currentCard.front}</h2>
+              {currentCard.transcription && (
+                <p className="text-sm text-muted-foreground mb-2">/{currentCard.transcription}/</p>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
+              >
+                <Volume2 className="h-4 w-4 mr-1" />
+                Listen
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-2">Type the translation of:</p>
+              <h2 className="text-3xl font-bold mb-1">{currentCard.back}</h2>
+              {currentCard.example && (
+                <p className="text-sm text-muted-foreground italic mt-2 max-w-xs">
+                  &quot;{currentCard.example}&quot;
+                </p>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative">
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your answer..."
-            className={`text-lg h-14 ${
-              feedback === "correct"
-                ? "border-green-500 bg-green-50 dark:bg-green-900/20"
-                : feedback === "wrong"
-                ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                : ""
-            }`}
-            disabled={!!feedback}
-            autoComplete="off"
-          />
-          {feedback && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              {feedback === "correct" ? (
-                <CheckCircle className="h-6 w-6 text-green-500" />
-              ) : (
-                <XCircle className="h-6 w-6 text-red-500" />
-              )}
+      {showHelp ? (
+        <div className="flex gap-2 justify-center">
+          <Button size="lg" className="w-full gap-2" onClick={handleTryAgain}>
+            <RotateCcw className="h-5 w-5" />
+            Try Again
+          </Button>
+          <Button size="lg" variant="outline" className="w-full gap-2" onClick={goToNext}>
+            Skip
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your answer..."
+              className={`text-lg h-14 ${
+                feedback === "correct"
+                  ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+                  : feedback === "wrong"
+                  ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                  : ""
+              }`}
+              disabled={!!feedback}
+              autoComplete="off"
+            />
+            {feedback && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {feedback === "correct" ? (
+                  <CheckCircle className="h-6 w-6 text-green-500" />
+                ) : (
+                  <XCircle className="h-6 w-6 text-red-500" />
+                )}
+              </div>
+            )}
+          </div>
+
+          {feedback === "wrong" && (
+            <p className="text-sm text-center">
+              Correct answer: <strong className="text-primary">{currentCard.front}</strong>
+            </p>
+          )}
+
+          {!feedback && (
+            <div className="flex gap-2">
+              <Button type="submit" size="lg" className="flex-1">
+                Check
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="gap-2"
+                onClick={handleHelp}
+              >
+                <Eye className="h-5 w-5" />
+                Help
+              </Button>
             </div>
           )}
-        </div>
-
-        {feedback === "wrong" && (
-          <p className="text-sm text-center">
-            Correct answer: <strong className="text-primary">{currentCard.back}</strong>
-          </p>
-        )}
-
-        {!feedback && (
-          <div className="flex gap-2 justify-center">
-            <Button type="submit" size="lg" className="w-full">
-              Check
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              onClick={() => setShowHint(true)}
-            >
-              Hint
-            </Button>
-          </div>
-        )}
-
-        {showHint && !feedback && (
-          <p className="text-center text-muted-foreground">
-            Hint: {currentCard.back.charAt(0)}{"_".repeat(Math.max(0, currentCard.back.length - 1))}
-          </p>
-        )}
-      </form>
+        </form>
+      )}
     </div>
   );
 }
