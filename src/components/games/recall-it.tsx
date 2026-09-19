@@ -167,27 +167,28 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
           <svg
             className="absolute inset-0 w-full h-full"
             viewBox={`0 0 ${cardW} ${cardH}`}
+            style={{ overflow: "visible" }}
           >
-            {/* Background border */}
+            {/* Background border - visible track */}
             <rect
-              x="2"
-              y="2"
-              width={cardW - 4}
-              height={cardH - 4}
+              x="1.5"
+              y="1.5"
+              width={cardW - 3}
+              height={cardH - 3}
               rx="16"
               ry="16"
               fill="none"
               stroke="currentColor"
               strokeWidth="3"
-              className="text-muted/20"
+              className="text-border"
             />
             {/* Timer progress border */}
             {!revealed && (
               <rect
-                x="2"
-                y="2"
-                width={cardW - 4}
-                height={cardH - 4}
+                x="1.5"
+                y="1.5"
+                width={cardW - 3}
+                height={cardH - 3}
                 rx="16"
                 ry="16"
                 fill="none"
@@ -195,14 +196,21 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
                 strokeWidth="3"
                 strokeDasharray={perimeter}
                 strokeDashoffset={perimeter - timerProgress}
-                strokeLinecap="round"
-                className="text-primary transition-all duration-1000 ease-linear"
+                className="text-primary"
               />
             )}
           </svg>
 
           {/* Card content */}
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-card">
+          <div
+            className="absolute rounded-2xl bg-card flex items-center justify-center"
+            style={{
+              top: 3,
+              left: 3,
+              right: 3,
+              bottom: 3,
+            }}
+          >
             {!revealed ? (
               <button
                 onClick={handleShow}
