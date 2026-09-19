@@ -388,7 +388,12 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   };
 
   const handleGameComplete = () => {
-    advanceRef.current();
+    const nextGameIdx = gameIndex + 1;
+    if (nextGameIdx < GAME_ORDER.length) {
+      setGameIndex(nextGameIdx);
+    } else {
+      advanceRef.current();
+    }
   };
 
   const currentGame = GAME_ORDER[gameIndex];
