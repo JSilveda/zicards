@@ -25,57 +25,66 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
   const [remembered, setRemembered] = useState(0);
   const [forgotten, setForgotten] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECONDS);
+  const [progress, setProgress] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+  const animRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
   const currentCard = queue[currentIndex];
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  const currentCardRef = useRef(currentCard);
+  currentCardRef.current = currentCard;
+
+  const speakIfNeeded = useCallback(() => {
+    if (currentCardRef.current && !revealed) {
+      speak(currentCardRef.current.front, getLanguageVoiceCode(sourceLanguage));
     }
-  }, []);
+  }, [sourceLanguage, revealed]);
 
   useEffect(() => {
-    if (currentCard && !revealed) {
-      speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
-    }
-  }, [currentIndex, currentCard, sourceLanguage, revealed]);
+    speakIfNeeded();
+  }, [currentIndex, speakIfNeeded]);
 
   useEffect(() => {
-    const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
-    onProgress?.(progress);
+    const p = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
+    onProgress?.(p);
   }, [currentIndex, queue.length, onProgress]);
 
+  // Smooth animation loop
   useEffect(() => {
-    if (revealed || !currentCard) return;
+    if (revealed || !currentCard) {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      return;
+    }
 
-    setTimeLeft(TIMER_SECONDS);
-    setRevealed(false);
+    setProgress(0);
+    startTimeRef.current = performance.now();
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          stopTimer();
-          setRevealed(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const animate = (now: number) => {
+      const elapsed = (now - startTimeRef.current) / 1000;
+      const pct = Math.min(elapsed / TIMER_SECONDS, 1);
+      setProgress(pct);
 
-    return () => stopTimer();
-  }, [currentIndex, currentCard, revealed, stopTimer]);
+      if (pct >= 1) {
+        setRevealed(true);
+        return;
+      }
+      animRef.current = requestAnimationFrame(animate);
+    };
+
+    animRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [currentIndex, currentCard, revealed]);
 
   const handleShow = () => {
-    stopTimer();
+    if (animRef.current) cancelAnimationFrame(animRef.current);
     setRevealed(true);
   };
 
   const handleRecall = (didRemember: boolean) => {
-    stopTimer();
+    if (animRef.current) cancelAnimationFrame(animRef.current);
     if (didRemember) {
       setRemembered((r) => r + 1);
       setScore((s) => s + 15);
@@ -88,7 +97,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
     } else {
       setCurrentIndex((i) => i + 1);
       setRevealed(false);
-      setTimeLeft(TIMER_SECONDS);
+      setProgress(0);
     }
   };
 
@@ -120,10 +129,11 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
   }
 
   // Card border dimensions for SVG
-  const cardW = 300;
-  const cardH = 180;
+  const cardW = 340;
+  const cardH = 160;
   const perimeter = 2 * (cardW + cardH);
-  const timerProgress = ((TIMER_SECONDS - timeLeft) / TIMER_SECONDS) * perimeter;
+  const dashOffset = perimeter * (1 - progress);
+  const timeLeft = Math.ceil(TIMER_SECONDS * (1 - progress));
 
   return (
     <div className="max-w-lg mx-auto p-4">
@@ -160,14 +170,13 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
         </CardContent>
       </Card>
 
-      {/* Back card with border progress */}
+      {/* Back card with border progress - same width as front card */}
       <div className="flex justify-center mb-6">
         <div className="relative" style={{ width: cardW, height: cardH }}>
           {/* SVG border progress */}
           <svg
             className="absolute inset-0 w-full h-full"
             viewBox={`0 0 ${cardW} ${cardH}`}
-            style={{ overflow: "visible" }}
           >
             {/* Background border - visible track */}
             <rect
@@ -195,7 +204,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
                 stroke="currentColor"
                 strokeWidth="3"
                 strokeDasharray={perimeter}
-                strokeDashoffset={perimeter - timerProgress}
+                strokeDashoffset={dashOffset}
                 className="text-primary"
               />
             )}
@@ -204,12 +213,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
           {/* Card content */}
           <div
             className="absolute rounded-2xl bg-card flex items-center justify-center"
-            style={{
-              top: 3,
-              left: 3,
-              right: 3,
-              bottom: 3,
-            }}
+            style={{ top: 3, left: 3, right: 3, bottom: 3 }}
           >
             {!revealed ? (
               <button
@@ -224,7 +228,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
               <div className="flex flex-col items-center justify-center w-full h-full">
                 <h3 className="text-3xl font-bold text-primary">{currentCard.back}</h3>
                 {currentCard.example && (
-                  <p className="text-sm text-muted-foreground italic mt-2 max-w-[250px] text-center">
+                  <p className="text-sm text-muted-foreground italic mt-2 max-w-[280px] text-center">
                     &quot;{currentCard.example}&quot;
                   </p>
                 )}
