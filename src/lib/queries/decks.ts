@@ -50,7 +50,7 @@ export async function getDecks(): Promise<Deck[]> {
           for (const card of cards) {
             const review = reviewMap.get(card.id);
             if (review) {
-              if (review.box_number >= 3) {
+              if (review.box_number >= 1) {
                 learnedCount++;
               }
               if (new Date(review.next_review_date) <= now) {
