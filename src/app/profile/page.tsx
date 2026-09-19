@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientOnly } from "@/components/client-only";
-import { User, Save } from "lucide-react";
+import { User, Save, Globe } from "lucide-react";
+import { LANGUAGES } from "@/lib/utils";
 
 function ProfileContent() {
   const [email, setEmail] = useState("");
@@ -15,6 +17,9 @@ function ProfileContent() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState("");
+  const [nativeLanguage, setNativeLanguage] = useState("es");
+  const [learningLanguage, setLearningLanguage] = useState("en");
+  const [langSaved, setLangSaved] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -28,6 +33,11 @@ function ProfileContent() {
         setLoading(false);
       });
     });
+
+    const savedNative = localStorage.getItem("nativeLanguage");
+    const savedLearning = localStorage.getItem("learningLanguage");
+    if (savedNative) setNativeLanguage(savedNative);
+    if (savedLearning) setLearningLanguage(savedLearning);
   }, []);
 
   const handleUpdateEmail = async (e: React.FormEvent) => {
@@ -47,6 +57,13 @@ function ProfileContent() {
     setUpdating(false);
   };
 
+  const handleSaveLanguages = () => {
+    localStorage.setItem("nativeLanguage", nativeLanguage);
+    localStorage.setItem("learningLanguage", learningLanguage);
+    setLangSaved(true);
+    setTimeout(() => setLangSaved(false), 2000);
+  };
+
   const handleSignOut = async () => {
     const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
@@ -58,6 +75,37 @@ function ProfileContent() {
 
   return (
     <>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Language Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">My native language</label>
+            <Select
+              value={nativeLanguage}
+              onChange={(e) => setNativeLanguage(e.target.value)}
+              options={LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Language I want to learn</label>
+            <Select
+              value={learningLanguage}
+              onChange={(e) => setLearningLanguage(e.target.value)}
+              options={LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
+            />
+          </div>
+          <Button onClick={handleSaveLanguages} className="gap-2">
+            <Save className="h-4 w-4" />
+            {langSaved ? "Saved!" : "Save Languages"}
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

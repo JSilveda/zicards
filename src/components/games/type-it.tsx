@@ -27,9 +27,33 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [nativeLang, setNativeLang] = useState(sourceLanguage);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Read native language from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("nativeLanguage");
+    if (saved) {
+      // If native language matches target, show target side (back), type source (front)
+      // If native language matches source, show source side (front), type target (back)
+      // If native language matches neither, default to source side
+      if (saved === targetLanguage) {
+        setNativeLang(targetLanguage);
+      } else {
+        setNativeLang(sourceLanguage);
+      }
+    }
+  }, [sourceLanguage, targetLanguage]);
+
   const currentCard = queue[currentIndex];
+
+  // Determine which side is shown (native language) and which is typed
+  const showSideIsTarget = nativeLang === targetLanguage;
+  const shownText = showSideIsTarget ? currentCard?.back : currentCard?.front;
+  const correctAnswer = showSideIsTarget ? currentCard?.front : currentCard?.back;
+  const shownLang = showSideIsTarget ? targetLanguage : sourceLanguage;
+  const answerLang = showSideIsTarget ? sourceLanguage : targetLanguage;
+
   const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
 
   useEffect(() => {
@@ -44,12 +68,10 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || feedback) return;
+    if (!input.trim() || feedback || !correctAnswer) return;
 
     const userAnswer = input.trim().toLowerCase();
-    const correctAnswer = currentCard.back.toLowerCase();
-
-    if (userAnswer === correctAnswer) {
+    if (userAnswer === correctAnswer.toLowerCase()) {
       setFeedback("correct");
       setScore((s) => s + 20);
       setCorrectCount((c) => c + 1);
@@ -76,7 +98,9 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
 
   const handleHelp = () => {
     setShowHelp(true);
-    speak(currentCard.back, getLanguageVoiceCode(targetLanguage));
+    if (correctAnswer) {
+      speak(correctAnswer, getLanguageVoiceCode(answerLang));
+    }
   };
 
   const handleTryAgain = () => {
@@ -130,11 +154,11 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
               {currentCard.image_url && (
                 <img
                   src={currentCard.image_url}
-                  alt={currentCard.back}
+                  alt={correctAnswer || ""}
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-2 text-primary">{currentCard.back}</h2>
+              <h2 className="text-3xl font-bold mb-2 text-primary">{correctAnswer}</h2>
               {currentCard.example && (
                 <p className="text-sm text-muted-foreground italic mb-2 max-w-xs">
                   &quot;{currentCard.example}&quot;
@@ -143,7 +167,7 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => speak(currentCard.back, getLanguageVoiceCode(targetLanguage))}
+                onClick={() => correctAnswer && speak(correctAnswer, getLanguageVoiceCode(answerLang))}
               >
                 <Volume2 className="h-4 w-4 mr-1" />
                 Listen
@@ -155,16 +179,16 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
               {currentCard.image_url && (
                 <img
                   src={currentCard.image_url}
-                  alt={currentCard.front}
+                  alt={shownText || ""}
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-1">{currentCard.front}</h2>
+              <h2 className="text-3xl font-bold mb-1">{shownText}</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 className="mt-2"
-                onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
+                onClick={() => shownText && speak(shownText, getLanguageVoiceCode(shownLang))}
               >
                 <Volume2 className="h-4 w-4 mr-1" />
                 Listen
@@ -215,7 +239,7 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
 
           {feedback === "wrong" && (
             <p className="text-sm text-center">
-              Correct answer: <strong className="text-primary">{currentCard.back}</strong>
+              Correct answer: <strong className="text-primary">{correctAnswer}</strong>
             </p>
           )}
 
