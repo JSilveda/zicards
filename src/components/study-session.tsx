@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,11 @@ import { LoadingPage } from "@/components/ui/loading";
 import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play } from "lucide-react";
 import type { Card as CardType, Deck } from "@/types";
 
+const PairIt = dynamic(() => import("@/components/games/pair-it").then((m) => m.PairIt), { ssr: false });
+const GuessIt = dynamic(() => import("@/components/games/guess-it").then((m) => m.GuessIt), { ssr: false });
+const RecallIt = dynamic(() => import("@/components/games/recall-it").then((m) => m.RecallIt), { ssr: false });
+const TypeIt = dynamic(() => import("@/components/games/type-it").then((m) => m.TypeIt), { ssr: false });
+
 interface StudySessionProps {
   deck: Deck;
   mode?: "learn" | "review" | "game" | "autoplay";
@@ -21,10 +27,22 @@ interface StudySessionProps {
 interface SavedProgress {
   deckId: string;
   mode: string;
-  currentIndex: number;
-  cardIds: string[];
-  correctCount: number;
-  incorrectCount: number;
+  batchIndex: number;
+  phase: string;
+  batchCardIds: string[];
+  totalCards: number;
+}
+
+const BATCH_SIZE = 5;
+const GAME_ORDER = ["pair-it", "guess-it", "recall-it", "type-it"] as const;
+
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 function getStorageKey(deckId: string, mode: string) {
@@ -43,7 +61,7 @@ function loadProgressData(deckId: string, mode: string): SavedProgress | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed.deckId !== deckId || parsed.mode !== mode) return null;
-    if (!parsed.cardIds || parsed.cardIds.length === 0) return null;
+    if (!parsed.batchCardIds || parsed.batchCardIds.length === 0) return null;
     return parsed;
   } catch {
     return null;
@@ -57,6 +75,12 @@ function clearProgressData(deckId: string, mode: string) {
 }
 
 export function StudySession({ deck, mode = "review", onProgress }: StudySessionProps) {
+  const [allCards, setAllCards] = useState<CardType[]>([]);
+  const [batches, setBatches] = useState<CardType[][]>([]);
+  const [batchIndex, setBatchIndex] = useState(0);
+  const [phase, setPhase] = useState<"flashcards" | "games">("flashcards");
+  const [gameIndex, setGameIndex] = useState(0);
+
   const [cards, setCards] = useState<CardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -66,6 +90,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+
   const [incorrectCardIds, setIncorrectCardIds] = useState<string[]>([]);
   const [isReasking, setIsReasking] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -74,44 +99,96 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set());
   const [answeredCardIds, setAnsweredCardIds] = useState<Set<string>>(new Set());
 
+  const createBatches = useCallback((cardsToBatch: CardType[]) => {
+    const shuffled = shuffleArray(cardsToBatch);
+    const result: CardType[][] = [];
+    for (let i = 0; i < shuffled.length; i += BATCH_SIZE) {
+      result.push(shuffled.slice(i, i + BATCH_SIZE));
+    }
+    return result;
+  }, []);
+
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
-      let cardsToUse: CardType[] = [];
       if (mode === "review") {
-        cardsToUse = await getDueCards(deck.id);
+        const dueCards = await getDueCards(deck.id);
+        setCards(dueCards);
+        setAllCards(dueCards);
+        setBatches([dueCards]);
+        setBatchIndex(0);
+        setPhase("flashcards");
+        setGameIndex(0);
+
+        const map = new Map<string, CardType>();
+        for (const c of dueCards) map.set(c.id, c);
+        setCardMap(map);
+
+        if (resume) {
+          setCurrentIndex(Math.min(resume.batchIndex, dueCards.length - 1));
+          setCorrectCount(0);
+          setIncorrectCount(0);
+        } else {
+          setCurrentIndex(0);
+          setCorrectCount(0);
+          setIncorrectCount(0);
+        }
+        setNewCardIds(new Set());
+      } else if (mode === "learn") {
+        const all = await getCards(deck.id);
+        const reviews = await getReviewsForDeck(deck.id);
+        const reviewedIds = new Set(reviews.map((r) => r.card_id));
+        const freshCards = all.filter((c) => !reviewedIds.has(c.id));
+        const reviewedCards = all.filter((c) => reviewedIds.has(c.id));
+        const learnCards = [...freshCards, ...reviewedCards];
+
+        setAllCards(learnCards);
+        setNewCardIds(new Set(freshCards.map((c) => c.id)));
+
+        const map = new Map<string, CardType>();
+        for (const c of learnCards) map.set(c.id, c);
+        setCardMap(map);
+
+        if (resume) {
+          const resBatchCards = resume.batchCardIds
+            .map((id) => map.get(id))
+            .filter(Boolean) as CardType[];
+          const newBatches = createBatches(learnCards);
+          setBatches(newBatches);
+          setBatchIndex(resume.batchIndex);
+          setPhase(resume.phase as "flashcards" | "games");
+          setGameIndex(0);
+          setCards(resBatchCards.length > 0 ? resBatchCards : newBatches[0] || []);
+          setCurrentIndex(0);
+          setCorrectCount(0);
+          setIncorrectCount(0);
+        } else {
+          const newBatches = createBatches(learnCards);
+          setBatches(newBatches);
+          setBatchIndex(0);
+          setPhase("flashcards");
+          setGameIndex(0);
+          setCards(newBatches[0] || []);
+          setCurrentIndex(0);
+          setCorrectCount(0);
+          setIncorrectCount(0);
+        }
       } else {
         const all = await getCards(deck.id);
-        if (mode === "learn") {
-          const reviews = await getReviewsForDeck(deck.id);
-          const reviewedIds = new Set(reviews.map((r) => r.card_id));
-          const freshCards = all.filter((c) => !reviewedIds.has(c.id));
-          const reviewedCards = all.filter((c) => reviewedIds.has(c.id));
-          cardsToUse = [...freshCards, ...reviewedCards].slice(0, 20);
-          setNewCardIds(new Set(freshCards.map((c) => c.id)));
-        } else {
-          cardsToUse = all;
-          setNewCardIds(new Set());
-        }
-      }
+        setCards(all);
+        setAllCards(all);
+        setBatches([all]);
+        setBatchIndex(0);
+        setPhase("flashcards");
+        setGameIndex(0);
 
-      const map = new Map<string, CardType>();
-      for (const c of cardsToUse) map.set(c.id, c);
-      setCardMap(map);
+        const map = new Map<string, CardType>();
+        for (const c of all) map.set(c.id, c);
+        setCardMap(map);
 
-      if (resume) {
-        const resumedCards = resume.cardIds
-          .map((id) => map.get(id))
-          .filter(Boolean) as CardType[];
-        const finalCards = resumedCards.length > 0 ? resumedCards : cardsToUse;
-        setCards(finalCards);
-        setCurrentIndex(Math.min(resume.currentIndex, finalCards.length - 1));
-        setCorrectCount(resume.correctCount);
-        setIncorrectCount(resume.incorrectCount);
-      } else {
-        setCards(cardsToUse);
         setCurrentIndex(0);
         setCorrectCount(0);
         setIncorrectCount(0);
+        setNewCardIds(new Set());
       }
       setIsComplete(false);
       setFlipped(false);
@@ -125,40 +202,49 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     } finally {
       setLoading(false);
     }
-  }, [deck.id, mode]);
+  }, [deck.id, mode, createBatches]);
 
   useEffect(() => {
     loadCards();
   }, [loadCards]);
 
   useEffect(() => {
-    if (loading || cards.length === 0 || mode === "autoplay" || isReasking) return;
-    const saved = loadProgressData(deck.id, mode);
-    if (saved && saved.currentIndex < saved.cardIds.length - 1) {
-      setPendingResume(saved);
-      setShowResumeDialog(true);
-    } else {
-      clearProgressData(deck.id, mode);
+    if (loading || mode === "autoplay" || isReasking || isComplete) return;
+    if (mode === "learn" || mode === "review") {
+      const saved = loadProgressData(deck.id, mode);
+      if (saved) {
+        setPendingResume(saved);
+        setShowResumeDialog(true);
+      }
     }
-  }, [deck.id, mode, loading, cards.length, isReasking]);
+  }, [deck.id, mode, loading, isReasking, isComplete]);
 
   useEffect(() => {
-    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog && !isReasking && currentIndex < cards.length - 1) {
-      saveProgressData({
-        deckId: deck.id,
-        mode,
-        currentIndex,
-        cardIds: cards.map((c) => c.id),
-        correctCount,
-        incorrectCount,
-      });
+    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog && !isReasking && !isComplete) {
+      if (mode === "learn") {
+        saveProgressData({
+          deckId: deck.id,
+          mode,
+          batchIndex,
+          phase,
+          batchCardIds: cards.map((c) => c.id),
+          totalCards: allCards.length,
+        });
+      }
     }
-  }, [currentIndex, cards, mode, deck.id, correctCount, incorrectCount, showResumeDialog, isReasking]);
+  }, [currentIndex, cards, mode, deck.id, batchIndex, phase, showResumeDialog, isReasking, isComplete, allCards.length]);
 
   useEffect(() => {
-    const progress = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
+    let progress = 0;
+    if (mode === "learn" && allCards.length > 0 && batches.length > 0) {
+      const completedBatches = batchIndex;
+      const batchProgress = phase === "games" ? 1 : (cards.length > 0 ? currentIndex / cards.length : 0);
+      progress = ((completedBatches + batchProgress) / batches.length) * 100;
+    } else if (cards.length > 0) {
+      progress = ((currentIndex + 1) / cards.length) * 100;
+    }
     onProgress?.(progress);
-  }, [currentIndex, cards.length, onProgress]);
+  }, [currentIndex, cards.length, onProgress, mode, batchIndex, phase, batches.length, allCards.length]);
 
   useEffect(() => {
     if (mode === "autoplay" && cards.length > 0 && isPlaying) {
@@ -183,6 +269,25 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       speak(text, getLanguageVoiceCode(lang));
     }
   }, [currentIndex, mode, cards, isPlaying, deck]);
+
+  const advanceToNextPhase = useCallback(() => {
+    if (mode !== "learn") return;
+
+    const nextBatchIdx = batchIndex + 1;
+    if (nextBatchIdx < batches.length) {
+      setBatchIndex(nextBatchIdx);
+      setCards(batches[nextBatchIdx]);
+      setCurrentIndex(0);
+      setFlipped(false);
+      setPhase("flashcards");
+      setGameIndex(0);
+      setIncorrectCardIds([]);
+      setIsReasking(false);
+    } else {
+      clearProgressData(deck.id, mode);
+      setIsComplete(true);
+    }
+  }, [mode, batchIndex, batches, deck.id]);
 
   const handleAnswer = async (correct: boolean) => {
     if (submitting) return;
@@ -221,24 +326,31 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       });
 
       if (currentIndex + 1 >= cards.length) {
-        const uniqueIncorrect = [...new Set(newIncorrectIds)];
-
-        if (uniqueIncorrect.length > 0) {
-          const reviewCards = uniqueIncorrect
-            .map((id) => cardMap.get(id))
-            .filter(Boolean) as CardType[];
-          if (reviewCards.length > 0) {
-            setIsReasking(true);
-            setCards(reviewCards);
-            setCurrentIndex(0);
-            setFlipped(false);
-            setIncorrectCardIds([]);
-            return;
+        if (mode === "learn") {
+          const uniqueIncorrect = [...new Set(newIncorrectIds)];
+          if (uniqueIncorrect.length > 0 && !isReasking) {
+            const reviewCards = uniqueIncorrect
+              .map((id) => cardMap.get(id))
+              .filter(Boolean) as CardType[];
+            if (reviewCards.length > 0) {
+              setIsReasking(true);
+              setCards(reviewCards);
+              setCurrentIndex(0);
+              setFlipped(false);
+              setIncorrectCardIds([]);
+              return;
+            }
           }
+          setPhase("games");
+          setGameIndex(0);
+          setCurrentIndex(0);
+          setFlipped(false);
+          setIsReasking(false);
+          setIncorrectCardIds([]);
+        } else {
+          clearProgressData(deck.id, mode);
+          setIsComplete(true);
         }
-
-        clearProgressData(deck.id, mode);
-        setIsComplete(true);
       } else {
         setCurrentIndex((i) => i + 1);
         setFlipped(false);
@@ -273,9 +385,21 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     }
   };
 
+  const handleGameComplete = () => {
+    if (mode !== "learn") return;
+    const nextGameIdx = gameIndex + 1;
+    if (nextGameIdx < GAME_ORDER.length) {
+      setGameIndex(nextGameIdx);
+    } else {
+      advanceToNextPhase();
+    }
+  };
+
+  const currentGame = GAME_ORDER[gameIndex];
+
   if (loading) return <LoadingPage />;
 
-  if (cards.length === 0) {
+  if (cards.length === 0 && !isComplete) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <Trophy className="h-16 w-16 text-primary mb-4" />
@@ -293,40 +417,63 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   if (isComplete) {
     return (
-      <>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-          <Trophy className="h-16 w-16 text-yellow-500 mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Session Complete!</h2>
-          <div className="flex gap-6 mb-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-green-500">{correctCount}</p>
-              <p className="text-sm text-muted-foreground">Correct</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-red-500">{incorrectCount}</p>
-              <p className="text-sm text-muted-foreground">Incorrect</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold">{correctCount + incorrectCount}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
-            </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+        <Trophy className="h-16 w-16 text-yellow-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Session Complete!</h2>
+        <div className="flex gap-6 mb-6">
+          <div className="text-center">
+            <p className="text-3xl font-bold text-green-500">{correctCount}</p>
+            <p className="text-sm text-muted-foreground">Correct</p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => loadCards()} className="gap-2">
-              <RotateCcw className="h-4 w-4" />
-              Study Again
-            </Button>
+          <div className="text-center">
+            <p className="text-3xl font-bold text-red-500">{incorrectCount}</p>
+            <p className="text-sm text-muted-foreground">Incorrect</p>
+          </div>
+          <div className="text-center">
+            <p className="text-3xl font-bold">{allCards.length}</p>
+            <p className="text-sm text-muted-foreground">Total</p>
           </div>
         </div>
-      </>
+        <div className="flex gap-2">
+          <Button onClick={() => loadCards()} className="gap-2">
+            <RotateCcw className="h-4 w-4" />
+            Study Again
+          </Button>
+        </div>
+      </div>
     );
   }
 
-  const currentCard = cards[currentIndex];
-  const isCurrentNew = newCardIds.has(currentCard.id) && !answeredCardIds.has(currentCard.id);
-  const isCurrentReask = isReasking;
+  if (mode === "learn" && phase === "games" && cards.length > 0) {
+    const gameKey = `${batchIndex}-${gameIndex}`;
+    const gameProps = {
+      cards,
+      sourceLanguage: deck.source_language,
+      targetLanguage: deck.target_language,
+      onComplete: handleGameComplete,
+      onProgress: () => {},
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto p-4">
+        <div className="mb-4 text-center">
+          <Badge variant="outline" className="mb-2">
+            Batch {batchIndex + 1} / {batches.length}
+          </Badge>
+          <p className="text-sm text-muted-foreground capitalize">
+            {currentGame.replace("-", " ")}
+          </p>
+        </div>
+        {currentGame === "pair-it" && <PairIt key={gameKey} cards={cards} onComplete={handleGameComplete} onProgress={() => {}} />}
+        {currentGame === "guess-it" && <GuessIt key={gameKey} {...gameProps} />}
+        {currentGame === "recall-it" && <RecallIt key={gameKey} {...gameProps} />}
+        {currentGame === "type-it" && <TypeIt key={gameKey} {...gameProps} />}
+      </div>
+    );
+  }
 
   if (mode === "autoplay") {
+    const currentCard = cards[currentIndex];
     return (
       <div className="max-w-2xl mx-auto p-4">
         <div className="mb-6">
@@ -336,7 +483,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             </Badge>
           </div>
         </div>
-
         <Card className="min-h-[300px] flex flex-col items-center justify-center p-8">
           <CardContent className="text-center p-0">
             {currentCard.image_url && (
@@ -358,7 +504,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             )}
           </CardContent>
         </Card>
-
         <div className="flex justify-center mt-6 gap-4">
           <Button
             size="lg"
@@ -367,21 +512,19 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             onClick={() => setIsPlaying(!isPlaying)}
           >
             {isPlaying ? (
-              <>
-                <Pause className="h-5 w-5" />
-                Pause
-              </>
+              <><Pause className="h-5 w-5" /> Pause</>
             ) : (
-              <>
-                <Play className="h-5 w-5" />
-                Play
-              </>
+              <><Play className="h-5 w-5" /> Play</>
             )}
           </Button>
         </div>
       </div>
     );
   }
+
+  const currentCard = cards[currentIndex];
+  const isCurrentNew = newCardIds.has(currentCard.id) && !answeredCardIds.has(currentCard.id);
+  const isCurrentReask = isReasking;
 
   return (
     <>
@@ -400,9 +543,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               </Badge>
             </div>
           </div>
-          {isReasking && (
+          {mode === "learn" && (
             <p className="text-xs text-muted-foreground mt-1">
-              Reviewing cards you missed
+              Batch {batchIndex + 1} of {batches.length}
+              {isReasking && " · Reviewing missed cards"}
             </p>
           )}
         </div>
