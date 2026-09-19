@@ -104,6 +104,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
+      if (!resume) {
+        clearProgressData(deck.id, mode);
+      }
+
       if (mode === "review") {
         const dueCards = await getDueCards(deck.id);
         setCards(dueCards);
@@ -212,16 +216,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     if (mode === "learn" || mode === "review") {
       const saved = loadProgressData(deck.id, mode);
       if (saved) {
-        const isAtStart = saved.batchIndex === 0 && saved.phase === "flashcards";
-        const batchIds = saved.batchCardIds || [];
-        const firstBatchIds = batchesRef.current[0]?.map((c) => c.id) || [];
-        const isSameAsFirstBatch =
-          batchIds.length === firstBatchIds.length &&
-          batchIds.every((id: string) => firstBatchIds.includes(id));
-        if (isAtStart && isSameAsFirstBatch) {
-          clearProgressData(deck.id, mode);
-          return;
-        }
         setPendingResume(saved);
         setShowResumeDialog(true);
       }
