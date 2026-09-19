@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +35,15 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
   const [totalMatched, setTotalMatched] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
     if (isComplete && autoAdvance) {
-      const timer = setTimeout(() => onComplete(), 1500);
+      const timer = setTimeout(() => onCompleteRef.current(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, autoAdvance, onComplete]);
+  }, [isComplete, autoAdvance]);
 
   const BLOCK_SIZE = 5;
 

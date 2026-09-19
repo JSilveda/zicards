@@ -29,12 +29,15 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
   const [wrongCount, setWrongCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
     if (isComplete && autoAdvance) {
-      const timer = setTimeout(() => onComplete(), 1500);
+      const timer = setTimeout(() => onCompleteRef.current(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, autoAdvance, onComplete]);
+  }, [isComplete, autoAdvance]);
 
   const [nativeLang, setNativeLang] = useState(sourceLanguage);
   const inputRef = useRef<HTMLInputElement>(null);

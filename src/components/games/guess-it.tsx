@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +25,15 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
   const [streak, setStreak] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
     if (isComplete && autoAdvance) {
-      const timer = setTimeout(() => onComplete(), 1500);
+      const timer = setTimeout(() => onCompleteRef.current(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, autoAdvance, onComplete]);
+  }, [isComplete, autoAdvance]);
 
   const shuffledCards = useMemo(() => [...cards].sort(() => Math.random() - 0.5), [cards]);
   const currentCard = shuffledCards[currentIndex];

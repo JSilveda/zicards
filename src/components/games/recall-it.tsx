@@ -27,12 +27,15 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
   const [forgotten, setForgotten] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
     if (isComplete && autoAdvance) {
-      const timer = setTimeout(() => onComplete(), 1500);
+      const timer = setTimeout(() => onCompleteRef.current(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, autoAdvance, onComplete]);
+  }, [isComplete, autoAdvance]);
 
   const [progress, setProgress] = useState(0);
   const [revealed, setRevealed] = useState(false);
