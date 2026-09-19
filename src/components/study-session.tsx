@@ -72,6 +72,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [pendingResume, setPendingResume] = useState<SavedProgress | null>(null);
   const [cardMap, setCardMap] = useState<Map<string, CardType>>(new Map());
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set());
+  const [answeredCardIds, setAnsweredCardIds] = useState<Set<string>>(new Set());
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -115,6 +116,9 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       setFlipped(false);
       setIncorrectCardIds([]);
       setIsReasking(false);
+      if (!resume) {
+        setAnsweredCardIds(new Set());
+      }
     } catch (error) {
       console.error("Failed to load cards:", error);
     } finally {
@@ -201,6 +205,11 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           : [...incorrectCardIds, currentCard.id];
       }
       setIncorrectCardIds(newIncorrectIds);
+      setAnsweredCardIds((prev) => {
+        const next = new Set(prev);
+        next.add(currentCard.id);
+        return next;
+      });
       setNewCardIds((prev) => {
         if (prev.has(currentCard.id)) {
           const next = new Set(prev);
@@ -313,7 +322,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   }
 
   const currentCard = cards[currentIndex];
-  const isCurrentNew = newCardIds.has(currentCard.id);
+  const isCurrentNew = newCardIds.has(currentCard.id) && !answeredCardIds.has(currentCard.id);
   const isCurrentReask = isReasking;
 
   if (mode === "autoplay") {
