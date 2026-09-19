@@ -124,14 +124,16 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   useEffect(() => {
     if (loading || cards.length === 0 || mode === "autoplay") return;
     const saved = loadProgressData(deck.id, mode);
-    if (saved && saved.currentIndex < saved.cardIds.length) {
+    if (saved && saved.currentIndex < saved.cardIds.length - 1) {
       setPendingResume(saved);
       setShowResumeDialog(true);
+    } else {
+      clearProgressData(deck.id, mode);
     }
   }, [deck.id, mode, loading, cards.length]);
 
   useEffect(() => {
-    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog) {
+    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog && currentIndex < cards.length - 1) {
       saveProgressData({
         deckId: deck.id,
         mode,
