@@ -14,15 +14,22 @@ export async function GET(request: NextRequest) {
 
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&seed=${seed}&nologo=true`;
 
-    return NextResponse.json({
-      images: [
-        {
-          id: 1,
-          url: imageUrl,
-          preview: imageUrl,
-          alt: query,
-        },
-      ],
+    const res = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!res.ok) {
+      return NextResponse.json({ error: "Failed to generate image" }, { status: 500 });
+    }
+
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const buffer = await res.arrayBuffer();
+
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
+      },
     });
   } catch (error) {
     console.error("Image generation error:", error);

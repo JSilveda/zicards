@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, Check, Loader2, Sparkles } from "lucide-react";
+import { Search, RefreshCw, Check, Loader2, Sparkles, ImageIcon } from "lucide-react";
 
 interface ImageResult {
   id: number;
   url: string;
   preview: string;
   alt: string;
+  loaded?: boolean;
 }
 
 interface ImageSearchModalProps {
@@ -26,54 +27,69 @@ export function ImageSearchModal({ open, onClose, onSelect, initialQuery = "" }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generatingId, setGeneratingId] = useState<number | null>(null);
 
-  const generateImages = async (searchQuery: string, append = false) => {
-    if (!searchQuery.trim()) return;
-    setLoading(true);
-    setGenerating(true);
-    setError("");
-
+  const generateOneImage = async (searchQuery: string, seed: number): Promise<ImageResult | null> => {
     try {
-      const newImages: ImageResult[] = [];
+      const apiUrl = `/api/search-images?q=${encodeURIComponent(searchQuery)}&seed=${seed}`;
+      const res = await fetch(apiUrl);
 
-      for (let i = 0; i < 4; i++) {
-        const seed = Math.floor(Math.random() * 100000);
-        const res = await fetch(`/api/search-images?q=${encodeURIComponent(searchQuery)}&seed=${seed}`);
-        const data = await res.json();
+      if (!res.ok) return null;
 
-        if (res.ok && data.images?.length > 0) {
-          newImages.push({
-            ...data.images[0],
-            id: Date.now() + i,
-          });
-        }
-      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
 
-      if (newImages.length === 0) {
-        setError("Failed to generate images. Try again.");
-        return;
-      }
-
-      if (append) {
-        setImages((prev) => [...prev, ...newImages]);
-      } else {
-        setImages(newImages);
-      }
+      return {
+        id: seed,
+        url: objectUrl,
+        preview: objectUrl,
+        alt: searchQuery,
+        loaded: true,
+      };
     } catch {
-      setError("Failed to generate images. Check your connection.");
-    } finally {
-      setLoading(false);
-      setGenerating(false);
+      return null;
     }
   };
 
-  const handleSearch = () => {
-    generateImages(query);
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError("");
+    setImages([]);
+
+    const seeds = Array.from({ length: 4 }, () => Math.floor(Math.random() * 100000));
+
+    for (let i = 0; i < seeds.length; i++) {
+      setGeneratingId(seeds[i]);
+      const result = await generateOneImage(query, seeds[i]);
+      if (result) {
+        setImages((prev) => [...prev, result]);
+      }
+      setGeneratingId(null);
+    }
+
+    setLoading(false);
+    setGeneratingId(null);
   };
 
-  const handleRegenerate = () => {
-    generateImages(query);
+  const handleRegenerate = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError("");
+
+    const seeds = Array.from({ length: 4 }, () => Math.floor(Math.random() * 100000));
+
+    for (let i = 0; i < seeds.length; i++) {
+      setGeneratingId(seeds[i]);
+      const result = await generateOneImage(query, seeds[i]);
+      if (result) {
+        setImages((prev) => [...prev, result]);
+      }
+      setGeneratingId(null);
+    }
+
+    setLoading(false);
+    setGeneratingId(null);
   };
 
   const handleSelect = (image: ImageResult) => {
@@ -96,7 +112,7 @@ export function ImageSearchModal({ open, onClose, onSelect, initialQuery = "" }:
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Describe the image (e.g. red apple, happy cat, house...)"
+            placeholder="Describe the image (e.g. red apple, happy cat...)"
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             autoFocus
           />
@@ -106,7 +122,7 @@ export function ImageSearchModal({ open, onClose, onSelect, initialQuery = "" }:
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Generate
+            {loading ? "Generating..." : "Generate"}
           </Button>
         </div>
 
@@ -138,29 +154,33 @@ export function ImageSearchModal({ open, onClose, onSelect, initialQuery = "" }:
                     </div>
                   </button>
                 ))}
+
+                {generatingId && (
+                  <div className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Generating...</p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-center mt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleRegenerate}
-                  disabled={generating}
-                  className="gap-2"
-                >
-                  {generating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+              {!loading && (
+                <div className="flex justify-center mt-4">
+                  <Button
+                    variant="outline"
+                    onClick={handleRegenerate}
+                    className="gap-2"
+                  >
                     <RefreshCw className="h-4 w-4" />
-                  )}
-                  Generate More
-                </Button>
-              </div>
+                    Generate More
+                  </Button>
+                </div>
+              )}
             </>
           )}
 
           {!loading && images.length === 0 && !error && (
             <div className="text-center py-12">
-              <Sparkles className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+              <ImageIcon className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-sm text-muted-foreground">
                 Type a word and click Generate to create AI images
               </p>
