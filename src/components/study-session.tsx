@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { submitReview, getDueCards } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
@@ -17,6 +18,45 @@ interface StudySessionProps {
   onProgress?: (progress: number) => void;
 }
 
+interface SavedProgress {
+  deckId: string;
+  mode: string;
+  currentIndex: number;
+  cardIds: string[];
+  correctCount: number;
+  incorrectCount: number;
+  incorrectCardIds: string[];
+}
+
+function getStorageKey(deckId: string, mode: string) {
+  return `study_progress_${deckId}_${mode}`;
+}
+
+function saveProgressData(data: SavedProgress) {
+  try {
+    localStorage.setItem(getStorageKey(data.deckId, data.mode), JSON.stringify(data));
+  } catch {}
+}
+
+function loadProgressData(deckId: string, mode: string): SavedProgress | null {
+  try {
+    const raw = localStorage.getItem(getStorageKey(deckId, mode));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.deckId !== deckId || parsed.mode !== mode) return null;
+    if (!parsed.cardIds || parsed.cardIds.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearProgressData(deckId: string, mode: string) {
+  try {
+    localStorage.removeItem(getStorageKey(deckId, mode));
+  } catch {}
+}
+
 export function StudySession({ deck, mode = "review", onProgress }: StudySessionProps) {
   const [cards, setCards] = useState<CardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -27,24 +67,47 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [incorrectCardIds, setIncorrectCardIds] = useState<string[]>([]);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [pendingResume, setPendingResume] = useState<SavedProgress | null>(null);
+  const [cardMap, setCardMap] = useState<Map<string, CardType>>(new Map());
 
-  const loadCards = useCallback(async () => {
+  const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
+      let cardsToUse: CardType[] = [];
       if (mode === "review") {
-        const dueCards = await getDueCards(deck.id);
-        setCards(dueCards);
+        cardsToUse = await getDueCards(deck.id);
       } else {
-        const allCards = await getCards(deck.id);
+        const all = await getCards(deck.id);
         if (mode === "learn") {
-          const newCards = allCards.filter((c) => !c.id);
-          setCards(newCards.length > 0 ? newCards : allCards.slice(0, 20));
+          const newCards = all.filter((c) => !c.id);
+          cardsToUse = newCards.length > 0 ? newCards : all.slice(0, 20);
         } else {
-          setCards(allCards);
+          cardsToUse = all;
         }
       }
-      setCurrentIndex(0);
-      setCorrectCount(0);
-      setIncorrectCount(0);
+
+      const map = new Map<string, CardType>();
+      for (const c of cardsToUse) map.set(c.id, c);
+      setCardMap(map);
+
+      if (resume) {
+        const resumedCards = resume.cardIds
+          .map((id) => map.get(id))
+          .filter(Boolean) as CardType[];
+        const finalCards = resumedCards.length > 0 ? resumedCards : cardsToUse;
+        setCards(finalCards);
+        setCurrentIndex(Math.min(resume.currentIndex, finalCards.length - 1));
+        setCorrectCount(resume.correctCount);
+        setIncorrectCount(resume.incorrectCount);
+        setIncorrectCardIds(resume.incorrectCardIds || []);
+      } else {
+        setCards(cardsToUse);
+        setCurrentIndex(0);
+        setCorrectCount(0);
+        setIncorrectCount(0);
+        setIncorrectCardIds([]);
+      }
       setIsComplete(false);
       setFlipped(false);
     } catch (error) {
@@ -57,6 +120,29 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   useEffect(() => {
     loadCards();
   }, [loadCards]);
+
+  useEffect(() => {
+    if (loading || cards.length === 0 || mode === "autoplay") return;
+    const saved = loadProgressData(deck.id, mode);
+    if (saved && saved.currentIndex < saved.cardIds.length) {
+      setPendingResume(saved);
+      setShowResumeDialog(true);
+    }
+  }, [deck.id, mode, loading, cards.length]);
+
+  useEffect(() => {
+    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog) {
+      saveProgressData({
+        deckId: deck.id,
+        mode,
+        currentIndex,
+        cardIds: cards.map((c) => c.id),
+        correctCount,
+        incorrectCount,
+        incorrectCardIds,
+      });
+    }
+  }, [currentIndex, cards, mode, deck.id, correctCount, incorrectCount, incorrectCardIds, showResumeDialog]);
 
   useEffect(() => {
     const progress = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
@@ -95,10 +181,38 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       const currentCard = cards[currentIndex];
       await submitReview(currentCard.id, correct);
 
-      if (correct) setCorrectCount((c) => c + 1);
-      else setIncorrectCount((c) => c + 1);
+      const newCorrectCount = correct ? correctCount + 1 : correctCount;
+      const newIncorrectCount = correct ? incorrectCount : incorrectCount + 1;
+      setCorrectCount(newCorrectCount);
+      setIncorrectCount(newIncorrectCount);
+
+      let newIncorrectIds: string[];
+      if (correct) {
+        newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+      } else {
+        newIncorrectIds = incorrectCardIds.includes(currentCard.id)
+          ? incorrectCardIds
+          : [...incorrectCardIds, currentCard.id];
+      }
+      setIncorrectCardIds(newIncorrectIds);
 
       if (currentIndex + 1 >= cards.length) {
+        const uniqueIncorrect = [...new Set(newIncorrectIds)];
+
+        if (uniqueIncorrect.length > 0) {
+          const reviewCards = uniqueIncorrect
+            .map((id) => cardMap.get(id))
+            .filter(Boolean) as CardType[];
+          if (reviewCards.length > 0) {
+            setCards(reviewCards);
+            setCurrentIndex(0);
+            setFlipped(false);
+            setIncorrectCardIds([]);
+            return;
+          }
+        }
+
+        clearProgressData(deck.id, mode);
         setIsComplete(true);
       } else {
         setCurrentIndex((i) => i + 1);
@@ -109,6 +223,21 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleResume = () => {
+    setShowResumeDialog(false);
+    if (pendingResume) {
+      loadCards(pendingResume);
+    }
+    setPendingResume(null);
+  };
+
+  const handleStartFresh = () => {
+    setShowResumeDialog(false);
+    clearProgressData(deck.id, mode);
+    setPendingResume(null);
+    loadCards();
   };
 
   const handleFlipAndSpeak = () => {
@@ -129,7 +258,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         <p className="text-muted-foreground mb-6">
           All caught up! Come back later for more reviews.
         </p>
-        <Button onClick={loadCards} className="gap-2">
+        <Button onClick={() => loadCards()} className="gap-2">
           <RotateCcw className="h-4 w-4" />
           Reload Cards
         </Button>
@@ -139,35 +268,36 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   if (isComplete) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-        <Trophy className="h-16 w-16 text-yellow-500 mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Session Complete!</h2>
-        <div className="flex gap-6 mb-6">
-          <div className="text-center">
-            <p className="text-3xl font-bold text-green-500">{correctCount}</p>
-            <p className="text-sm text-muted-foreground">Correct</p>
+      <>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+          <Trophy className="h-16 w-16 text-yellow-500 mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Session Complete!</h2>
+          <div className="flex gap-6 mb-6">
+            <div className="text-center">
+              <p className="text-3xl font-bold text-green-500">{correctCount}</p>
+              <p className="text-sm text-muted-foreground">Correct</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-red-500">{incorrectCount}</p>
+              <p className="text-sm text-muted-foreground">Incorrect</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold">{correctCount + incorrectCount}</p>
+              <p className="text-sm text-muted-foreground">Total</p>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-red-500">{incorrectCount}</p>
-            <p className="text-sm text-muted-foreground">Incorrect</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold">{cards.length}</p>
-            <p className="text-sm text-muted-foreground">Total</p>
+          <div className="flex gap-2">
+            <Button onClick={() => loadCards()} className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Study Again
+            </Button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={loadCards} className="gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Study Again
-          </Button>
-        </div>
-      </div>
+      </>
     );
   }
 
   const currentCard = cards[currentIndex];
-  const progress = ((currentIndex + 1) / cards.length) * 100;
 
   if (mode === "autoplay") {
     return (
@@ -227,134 +357,158 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <Badge variant="outline">
-            {currentIndex + 1} / {cards.length}
-          </Badge>
-          <div className="flex gap-2">
-            <Badge variant="secondary" className="text-green-600">
-              {correctCount} correct
+    <>
+      <div className="max-w-2xl mx-auto p-4">
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <Badge variant="outline">
+              {currentIndex + 1} / {cards.length}
             </Badge>
-            <Badge variant="secondary" className="text-red-600">
-              {incorrectCount} incorrect
-            </Badge>
+            <div className="flex gap-2">
+              <Badge variant="secondary" className="text-green-600">
+                {correctCount} correct
+              </Badge>
+              <Badge variant="secondary" className="text-red-600">
+                {incorrectCount} incorrect
+              </Badge>
+            </div>
           </div>
+          {incorrectCardIds.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {incorrectCardIds.length} card{incorrectCardIds.length !== 1 ? "s" : ""} to review again
+            </p>
+          )}
         </div>
-      </div>
 
-      <div
-        className="cursor-pointer mb-6"
-        onClick={handleFlipAndSpeak}
-        style={{ perspective: "1000px" }}
-      >
         <div
-          className="transition-transform duration-500 relative"
-          style={{
-            transformStyle: "preserve-3d",
-            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-          }}
+          className="cursor-pointer mb-6"
+          onClick={handleFlipAndSpeak}
+          style={{ perspective: "1000px" }}
         >
-          {/* Front */}
-          <Card
-            className="w-full min-h-[300px] flex flex-col items-center justify-center p-8"
-            style={{ backfaceVisibility: "hidden" }}
+          <div
+            className="transition-transform duration-500 relative"
+            style={{
+              transformStyle: "preserve-3d",
+              transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            }}
           >
-            <CardContent className="text-center p-0">
-              <p className="text-sm text-muted-foreground mb-4">
-                Tap to reveal answer
-              </p>
-              {currentCard.image_url && (
-                <img
-                  src={currentCard.image_url}
-                  alt={currentCard.front}
-                  className="max-h-36 rounded-lg object-cover mx-auto mb-4"
-                />
-              )}
-              <h2 className="text-4xl font-bold mb-3">{currentCard.front}</h2>
-              {currentCard.transcription && (
-                <p className="text-muted-foreground mb-2">
-                  /{currentCard.transcription}/
+            <Card
+              className="w-full min-h-[300px] flex flex-col items-center justify-center p-8"
+              style={{ backfaceVisibility: "hidden" }}
+            >
+              <CardContent className="text-center p-0">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tap to reveal answer
                 </p>
-              )}
-              {currentCard.gender && (
-                <Badge variant="secondary">{currentCard.gender}</Badge>
-              )}
-              <div className="mt-4">
+                {currentCard.image_url && (
+                  <img
+                    src={currentCard.image_url}
+                    alt={currentCard.front}
+                    className="max-h-36 rounded-lg object-cover mx-auto mb-4"
+                  />
+                )}
+                <h2 className="text-4xl font-bold mb-3">{currentCard.front}</h2>
+                {currentCard.transcription && (
+                  <p className="text-muted-foreground mb-2">
+                    /{currentCard.transcription}/
+                  </p>
+                )}
+                {currentCard.gender && (
+                  <Badge variant="secondary">{currentCard.gender}</Badge>
+                )}
+                <div className="mt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speak(currentCard.front, getLanguageVoiceCode(deck.source_language));
+                    }}
+                  >
+                    <Volume2 className="h-4 w-4 mr-1" />
+                    Listen
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="w-full min-h-[300px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
+              style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+            >
+              <CardContent className="text-center p-0">
+                {currentCard.image_url && (
+                  <img
+                    src={currentCard.image_url}
+                    alt={currentCard.back}
+                    className="max-h-36 rounded-lg object-cover mx-auto mb-4"
+                  />
+                )}
+                <h2 className="text-4xl font-bold mb-3">{currentCard.back}</h2>
+                {currentCard.example && (
+                  <p className="text-muted-foreground italic mb-4 max-w-sm">
+                    &quot;{currentCard.example}&quot;
+                  </p>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    speak(currentCard.front, getLanguageVoiceCode(deck.source_language));
+                    speak(currentCard.back, getLanguageVoiceCode(deck.target_language));
                   }}
                 >
                   <Volume2 className="h-4 w-4 mr-1" />
                   Listen
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Back */}
-          <Card
-            className="w-full min-h-[300px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
-            style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-          >
-            <CardContent className="text-center p-0">
-              {currentCard.image_url && (
-                <img
-                  src={currentCard.image_url}
-                  alt={currentCard.back}
-                  className="max-h-36 rounded-lg object-cover mx-auto mb-4"
-                />
-              )}
-              <h2 className="text-4xl font-bold mb-3">{currentCard.back}</h2>
-              {currentCard.example && (
-                <p className="text-muted-foreground italic mb-4 max-w-sm">
-                  &quot;{currentCard.example}&quot;
-                </p>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  speak(currentCard.back, getLanguageVoiceCode(deck.target_language));
-                }}
-              >
-                <Volume2 className="h-4 w-4 mr-1" />
-                Listen
-              </Button>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
+
+        {flipped && (
+          <div className="flex justify-center gap-4">
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2 text-red-600 hover:text-red-600 hover:bg-red-50 min-w-[140px]"
+              onClick={() => handleAnswer(false)}
+              disabled={submitting}
+            >
+              <XCircle className="h-5 w-5" />
+              Incorrect
+            </Button>
+            <Button
+              size="lg"
+              className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
+              onClick={() => handleAnswer(true)}
+              disabled={submitting}
+            >
+              <CheckCircle className="h-5 w-5" />
+              Correct
+            </Button>
+          </div>
+        )}
       </div>
 
-      {flipped && (
-        <div className="flex justify-center gap-4">
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 text-red-600 hover:text-red-600 hover:bg-red-50 min-w-[140px]"
-            onClick={() => handleAnswer(false)}
-            disabled={submitting}
-          >
-            <XCircle className="h-5 w-5" />
-            Incorrect
-          </Button>
-          <Button
-            size="lg"
-            className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
-            onClick={() => handleAnswer(true)}
-            disabled={submitting}
-          >
-            <CheckCircle className="h-5 w-5" />
-            Correct
-          </Button>
-        </div>
-      )}
-    </div>
+      <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Resume Study Session?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You have a saved session for this deck. Would you like to continue where you left off?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleStartFresh}>
+              Start Fresh
+            </Button>
+            <Button onClick={handleResume}>
+              Resume
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
