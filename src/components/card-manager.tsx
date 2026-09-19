@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
-import { Plus, Image } from "lucide-react";
+import { Plus, Image, ArrowUpDown } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface CardManagerProps {
@@ -29,6 +29,7 @@ export function CardManager({
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CardType | null>(null);
+  const [sortBy, setSortBy] = useState("newest");
   const [form, setForm] = useState({
     front: "",
     back: "",
@@ -129,14 +130,47 @@ export function CardManager({
     );
   });
 
+  const sortedCards = [...filteredCards].sort((a, b) => {
+    switch (sortBy) {
+      case "oldest":
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case "az":
+        return a.front.localeCompare(b.front);
+      case "za":
+        return b.front.localeCompare(a.front);
+      case "newest":
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
+
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Loading cards...</div>;
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {sortedCards.length} card{sortedCards.length !== 1 ? "s" : ""}
+        </p>
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <Select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="w-auto h-8 text-xs"
+            options={[
+              { value: "newest", label: "Newest first" },
+              { value: "oldest", label: "Oldest first" },
+              { value: "az", label: "A - Z" },
+              { value: "za", label: "Z - A" },
+            ]}
+          />
+        </div>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {filteredCards.length === 0 ? (
+        {sortedCards.length === 0 ? (
           <Card className="py-12 text-center md:col-span-2 lg:col-span-3">
             <CardContent>
               <p className="text-muted-foreground mb-4">
@@ -151,7 +185,7 @@ export function CardManager({
             </CardContent>
           </Card>
         ) : (
-          filteredCards.map((card) => (
+          sortedCards.map((card) => (
             <FlashCard
               key={card.id}
               card={card}

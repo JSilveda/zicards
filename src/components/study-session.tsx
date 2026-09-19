@@ -85,7 +85,8 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           const reviews = await getReviewsForDeck(deck.id);
           const reviewedIds = new Set(reviews.map((r) => r.card_id));
           const freshCards = all.filter((c) => !reviewedIds.has(c.id));
-          cardsToUse = freshCards.length > 0 ? freshCards : all.slice(0, 20);
+          const reviewedCards = all.filter((c) => reviewedIds.has(c.id));
+          cardsToUse = [...freshCards, ...reviewedCards].slice(0, 20);
           setNewCardIds(new Set(freshCards.map((c) => c.id)));
         } else {
           cardsToUse = all;
