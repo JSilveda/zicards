@@ -387,16 +387,21 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     }
   };
 
-  const handleGameComplete = () => {
-    const nextGameIdx = gameIndex + 1;
+  const gameIndexRef = useRef(gameIndex);
+  gameIndexRef.current = gameIndex;
+
+  const handleGameComplete = useCallback(() => {
+    const nextGameIdx = gameIndexRef.current + 1;
     if (nextGameIdx < GAME_ORDER.length) {
       setGameIndex(nextGameIdx);
     } else {
       advanceRef.current();
     }
-  };
+  }, []);
 
-  const currentGame = GAME_ORDER[gameIndex];
+  const noopProgress = useCallback(() => {}, []);
+
+  const currentGame = GAME_ORDER[gameIndexRef.current];
 
   if (loading) return <LoadingPage />;
 
@@ -459,7 +464,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           </p>
         </div>
         {currentGame === "pair-it" && (
-          <PairIt key={gameKey} cards={cards} onComplete={handleGameComplete} onProgress={() => {}} autoAdvance />
+          <PairIt key={gameKey} cards={cards} onComplete={handleGameComplete} onProgress={noopProgress} autoAdvance />
         )}
         {currentGame === "guess-it" && (
           <GuessIt
@@ -468,7 +473,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             sourceLanguage={deck.source_language}
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
-            onProgress={() => {}}
+            onProgress={noopProgress}
             autoAdvance
           />
         )}
@@ -479,7 +484,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             sourceLanguage={deck.source_language}
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
-            onProgress={() => {}}
+            onProgress={noopProgress}
             autoAdvance
           />
         )}
@@ -490,7 +495,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             sourceLanguage={deck.source_language}
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
-            onProgress={() => {}}
+            onProgress={noopProgress}
             autoAdvance
           />
         )}
