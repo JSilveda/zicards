@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getLanguageName } from "@/lib/utils";
 import { GamesModal } from "@/components/games/games-modal";
 import {
@@ -15,6 +16,7 @@ import {
   RefreshCw,
   MoreHorizontal,
   Gamepad2,
+  RotateCcw,
 } from "lucide-react";
 import type { Deck } from "@/types";
 
@@ -27,6 +29,7 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showGamesModal, setShowGamesModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const router = useRouter();
 
   const totalCards = deck.card_count || 0;
@@ -49,6 +52,34 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
 
   const handleCardClick = () => {
     router.push(`/decks/${deck.id}`);
+  };
+
+  const handleResetProgress = async () => {
+    setShowResetModal(false);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: cards } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("deck_id", deck.id);
+
+      if (cards && cards.length > 0) {
+        const cardIds = cards.map((c: { id: string }) => c.id);
+        await supabase
+          .from("reviews")
+          .delete()
+          .in("card_id", cardIds)
+          .eq("user_id", user.id);
+      }
+
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to reset progress:", error);
+    }
   };
 
   return (
@@ -174,6 +205,17 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
                       >
                         <Upload className="h-4 w-4" />
                         Import / Export
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          setShowResetModal(true);
+                        }}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset Progress
                       </button>
                       {onDelete && (
                         <button
@@ -302,6 +344,26 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
           router.push(`/decks/${deck.id}/study?mode=game&game=${game}`);
         }}
       />
+
+      {/* Reset Progress Modal */}
+      <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset Progress</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            All review history for this deck will be deleted. This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResetModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleResetProgress}>
+              Reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

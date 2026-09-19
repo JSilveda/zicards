@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getDeck, updateDeck, deleteDeck } from "@/lib/queries/decks";
 import { LANGUAGES, getLanguageName } from "@/lib/utils";
 import { GamesModal } from "@/components/games/games-modal";
@@ -49,6 +50,7 @@ export default function DeckDetailPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showGamesModal, setShowGamesModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"cards" | "settings" | "import">("cards");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -123,8 +125,7 @@ export default function DeckDetailPage() {
   };
 
   const handleResetProgress = async () => {
-    setShowMenu(false);
-    if (!confirm("Reset all progress for this deck? This cannot be undone.")) return;
+    setShowResetModal(false);
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
@@ -217,7 +218,10 @@ export default function DeckDetailPage() {
                 </button>
                 <button
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
-                  onClick={handleResetProgress}
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowResetModal(true);
+                  }}
                 >
                   <RotateCcw className="h-4 w-4" />
                   Reset Progress
@@ -490,6 +494,26 @@ export default function DeckDetailPage() {
             router.push(`/decks/${deckId}/study?mode=game&game=${game}`);
           }}
         />
+
+        {/* Reset Progress Modal */}
+        <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Reset Progress</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              All review history for this deck will be deleted. This action cannot be undone.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowResetModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleResetProgress}>
+                Reset
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </AuthGuard>
   );
