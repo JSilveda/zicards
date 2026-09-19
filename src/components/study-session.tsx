@@ -201,6 +201,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           : [...incorrectCardIds, currentCard.id];
       }
       setIncorrectCardIds(newIncorrectIds);
+      setNewCardIds((prev) => {
+        if (prev.has(currentCard.id)) {
+          const next = new Set(prev);
+          next.delete(currentCard.id);
+          return next;
+        }
+        return prev;
+      });
 
       if (currentIndex + 1 >= cards.length) {
         const uniqueIncorrect = [...new Set(newIncorrectIds)];
