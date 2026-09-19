@@ -125,3 +125,6 @@ create policy "Users can insert own reviews" on reviews
 
 create policy "Users can update own reviews" on reviews
   for update using (auth.uid() = user_id);
+
+create policy "Users can delete own reviews" on reviews
+  for delete using (auth.uid() = user_id);
