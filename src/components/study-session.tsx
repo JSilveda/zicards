@@ -294,74 +294,76 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     if (submitting) return;
     setSubmitting(true);
 
+    const currentCard = cards[currentIndex];
+    if (!currentCard) { setSubmitting(false); return; }
+
     try {
-      const currentCard = cards[currentIndex];
-      if (!currentCard) return;
       await submitReview(currentCard.id, correct);
-
-      const newCorrectCount = correct ? correctCount + 1 : correctCount;
-      const newIncorrectCount = correct ? incorrectCount : incorrectCount + 1;
-      setCorrectCount(newCorrectCount);
-      setIncorrectCount(newIncorrectCount);
-
-      let newIncorrectIds: string[];
-      if (correct) {
-        newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
-      } else {
-        newIncorrectIds = incorrectCardIds.includes(currentCard.id)
-          ? incorrectCardIds
-          : [...incorrectCardIds, currentCard.id];
-      }
-      setIncorrectCardIds(newIncorrectIds);
-      setAnsweredCardIds((prev) => {
-        const next = new Set(prev);
-        next.add(currentCard.id);
-        return next;
-      });
-      setNewCardIds((prev) => {
-        if (prev.has(currentCard.id)) {
-          const next = new Set(prev);
-          next.delete(currentCard.id);
-          return next;
-        }
-        return prev;
-      });
-
-      if (currentIndex + 1 >= cards.length) {
-        if (mode === "learn") {
-          const uniqueIncorrect = [...new Set(newIncorrectIds)];
-          if (uniqueIncorrect.length > 0 && !isReasking) {
-            const reviewCards = uniqueIncorrect
-              .map((id) => cardMap.get(id))
-              .filter(Boolean) as CardType[];
-            if (reviewCards.length > 0) {
-              setIsReasking(true);
-              setCards(reviewCards);
-              setCurrentIndex(0);
-              setFlipped(false);
-              setIncorrectCardIds([]);
-              return;
-            }
-          }
-          setPhase("games");
-          setGameIndex(0);
-          setCurrentIndex(0);
-          setFlipped(false);
-          setIsReasking(false);
-          setIncorrectCardIds([]);
-        } else {
-          clearProgressData(deck.id, mode);
-          setIsComplete(true);
-        }
-      } else {
-        setCurrentIndex((i) => i + 1);
-        setFlipped(false);
-      }
     } catch (error) {
       console.error("Failed to submit review:", error);
-    } finally {
-      setSubmitting(false);
     }
+
+    const newCorrectCount = correct ? correctCount + 1 : correctCount;
+    const newIncorrectCount = correct ? incorrectCount : incorrectCount + 1;
+    setCorrectCount(newCorrectCount);
+    setIncorrectCount(newIncorrectCount);
+
+    let newIncorrectIds: string[];
+    if (correct) {
+      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+    } else {
+      newIncorrectIds = incorrectCardIds.includes(currentCard.id)
+        ? incorrectCardIds
+        : [...incorrectCardIds, currentCard.id];
+    }
+    setIncorrectCardIds(newIncorrectIds);
+    setAnsweredCardIds((prev) => {
+      const next = new Set(prev);
+      next.add(currentCard.id);
+      return next;
+    });
+    setNewCardIds((prev) => {
+      if (prev.has(currentCard.id)) {
+        const next = new Set(prev);
+        next.delete(currentCard.id);
+        return next;
+      }
+      return prev;
+    });
+
+    if (currentIndex + 1 >= cards.length) {
+      if (mode === "learn") {
+        const uniqueIncorrect = [...new Set(newIncorrectIds)];
+        if (uniqueIncorrect.length > 0 && !isReasking) {
+          const reviewCards = uniqueIncorrect
+            .map((id) => cardMap.get(id))
+            .filter(Boolean) as CardType[];
+          if (reviewCards.length > 0) {
+            setIsReasking(true);
+            setCards(reviewCards);
+            setCurrentIndex(0);
+            setFlipped(false);
+            setIncorrectCardIds([]);
+            setSubmitting(false);
+            return;
+          }
+        }
+        setPhase("games");
+        setGameIndex(0);
+        setCurrentIndex(0);
+        setFlipped(false);
+        setIsReasking(false);
+        setIncorrectCardIds([]);
+      } else {
+        clearProgressData(deck.id, mode);
+        setIsComplete(true);
+      }
+    } else {
+      setCurrentIndex((i) => i + 1);
+      setFlipped(false);
+    }
+
+    setSubmitting(false);
   };
 
   const handleResume = () => {

@@ -89,7 +89,7 @@ export async function submitReview(
     .select("*")
     .eq("card_id", cardId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   const currentBox = (existingReview as ReviewRow | null)?.box_number || 1;
   const { nextBox, intervalDays } = calculateNextReview(currentBox, correct);
