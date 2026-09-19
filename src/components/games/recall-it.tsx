@@ -17,13 +17,10 @@ interface RecallItProps {
 }
 
 const TIMER_SECONDS = 5;
-const CIRCLE_RADIUS = 70;
-const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 
 export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: RecallItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showBack, setShowBack] = useState(false);
   const [score, setScore] = useState(0);
   const [remembered, setRemembered] = useState(0);
   const [forgotten, setForgotten] = useState(0);
@@ -52,7 +49,6 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
     onProgress?.(progress);
   }, [currentIndex, queue.length, onProgress]);
 
-  // Timer countdown
   useEffect(() => {
     if (revealed || !currentCard) return;
 
@@ -123,7 +119,11 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
     );
   }
 
-  const timerProgress = ((TIMER_SECONDS - timeLeft) / TIMER_SECONDS) * CIRCLE_CIRCUMFERENCE;
+  // Card border dimensions for SVG
+  const cardW = 300;
+  const cardH = 180;
+  const perimeter = 2 * (cardW + cardH);
+  const timerProgress = ((TIMER_SECONDS - timeLeft) / TIMER_SECONDS) * perimeter;
 
   return (
     <div className="max-w-lg mx-auto p-4">
@@ -160,60 +160,73 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
         </CardContent>
       </Card>
 
-      {/* Back card with timer border */}
+      {/* Back card with border progress */}
       <div className="flex justify-center mb-6">
-        <div className="relative w-[160px] h-[160px]">
-          {/* SVG circle timer */}
+        <div className="relative" style={{ width: cardW, height: cardH }}>
+          {/* SVG border progress */}
           <svg
-            className="absolute inset-0 w-full h-full -rotate-90"
-            viewBox="0 0 160 160"
+            className="absolute inset-0 w-full h-full"
+            viewBox={`0 0 ${cardW} ${cardH}`}
           >
-            {/* Background circle */}
-            <circle
-              cx="80"
-              cy="80"
-              r={CIRCLE_RADIUS}
+            {/* Background border */}
+            <rect
+              x="2"
+              y="2"
+              width={cardW - 4}
+              height={cardH - 4}
+              rx="16"
+              ry="16"
               fill="none"
               stroke="currentColor"
-              strokeWidth="4"
-              className="text-muted/30"
+              strokeWidth="3"
+              className="text-muted/20"
             />
-            {/* Progress circle */}
-            <circle
-              cx="80"
-              cy="80"
-              r={CIRCLE_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              strokeDasharray={CIRCLE_CIRCUMFERENCE}
-              strokeDashoffset={CIRCLE_CIRCUMFERENCE - timerProgress}
-              strokeLinecap="round"
-              className="text-primary transition-all duration-1000 ease-linear"
-            />
+            {/* Timer progress border */}
+            {!revealed && (
+              <rect
+                x="2"
+                y="2"
+                width={cardW - 4}
+                height={cardH - 4}
+                rx="16"
+                ry="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeDasharray={perimeter}
+                strokeDashoffset={perimeter - timerProgress}
+                strokeLinecap="round"
+                className="text-primary transition-all duration-1000 ease-linear"
+              />
+            )}
           </svg>
 
-          {/* Card content inside the circle */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Card content */}
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-card">
             {!revealed ? (
               <button
                 onClick={handleShow}
-                className="flex flex-col items-center justify-center w-[140px] h-[140px] rounded-full bg-card border-2 border-muted/20 hover:border-primary/50 transition-colors cursor-pointer"
+                className="flex flex-col items-center justify-center w-full h-full hover:bg-muted/30 transition-colors rounded-2xl cursor-pointer"
               >
                 <Eye className="h-6 w-6 text-muted-foreground mb-1" />
                 <span className="text-sm font-medium text-muted-foreground">Show</span>
                 <span className="text-xs text-muted-foreground/60 mt-0.5">{timeLeft}s</span>
               </button>
             ) : (
-              <div className="flex flex-col items-center justify-center w-[140px] h-[140px] rounded-full bg-primary/5 border-2 border-primary/30">
-                <h3 className="text-xl font-bold text-primary text-center px-2">{currentCard.back}</h3>
+              <div className="flex flex-col items-center justify-center w-full h-full">
+                <h3 className="text-3xl font-bold text-primary">{currentCard.back}</h3>
+                {currentCard.example && (
+                  <p className="text-sm text-muted-foreground italic mt-2 max-w-[250px] text-center">
+                    &quot;{currentCard.example}&quot;
+                  </p>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Action buttons - only shown when revealed */}
+      {/* Action buttons */}
       {revealed && (
         <div className="flex justify-center gap-4">
           <Button
