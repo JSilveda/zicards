@@ -28,6 +28,7 @@ import {
   Gamepad2,
   Settings,
   Upload,
+  RotateCcw,
 } from "lucide-react";
 import type { Deck } from "@/types";
 
@@ -121,6 +122,35 @@ export default function DeckDetailPage() {
     }
   };
 
+  const handleResetProgress = async () => {
+    setShowMenu(false);
+    if (!confirm("Reset all progress for this deck? This cannot be undone.")) return;
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: cards } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("deck_id", deckId);
+
+      if (cards && cards.length > 0) {
+        const cardIds = cards.map((c: { id: string }) => c.id);
+        await supabase
+          .from("reviews")
+          .delete()
+          .in("card_id", cardIds)
+          .eq("user_id", user.id);
+      }
+
+      loadDeck();
+    } catch (error) {
+      console.error("Failed to reset progress:", error);
+    }
+  };
+
   const progress = deck?.progress_percent || 0;
   const totalCards = deck?.card_count || 0;
   const dueCount = deck?.due_count || 0;
@@ -184,6 +214,13 @@ export default function DeckDetailPage() {
                 >
                   <Upload className="h-4 w-4" />
                   Import / Export
+                </button>
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                  onClick={handleResetProgress}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset Progress
                 </button>
                 <button
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left text-destructive"
