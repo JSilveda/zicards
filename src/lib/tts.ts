@@ -45,49 +45,53 @@ function findBestVoice(
 }
 
 export async function speak(text: string, lang: string = "en-US") {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
+  try {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
 
-  window.speechSynthesis.cancel();
+    window.speechSynthesis.cancel();
 
-  const voices = await ensureVoicesLoaded();
-  const voice = findBestVoice(voices, lang);
+    const voices = await ensureVoicesLoaded();
+    const voice = findBestVoice(voices, lang);
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
-  utterance.rate = 0.85;
-  utterance.pitch = 1;
-  utterance.volume = 1;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 0.85;
+    utterance.pitch = 1;
+    utterance.volume = 1;
 
-  if (voice) {
-    utterance.voice = voice;
-  }
+    if (voice) {
+      utterance.voice = voice;
+    }
 
-  window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
+  } catch {}
 }
 
 export async function speakWithVoice(text: string, voiceUri: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
+  try {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
 
-  window.speechSynthesis.cancel();
+    window.speechSynthesis.cancel();
 
-  const voices = await ensureVoicesLoaded();
-  const voice = voices.find((v) => v.voiceURI === voiceUri);
+    const voices = await ensureVoicesLoaded();
+    const voice = voices.find((v) => v.voiceURI === voiceUri);
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.85;
-  utterance.pitch = 1;
-  utterance.volume = 1;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.85;
+    utterance.pitch = 1;
+    utterance.volume = 1;
 
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  }
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
 
-  window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utterance);
+  } catch {}
 }
 
 export function getAvailableVoices(langCode: string) {
