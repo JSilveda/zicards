@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
-import { submitReview, getDueCards } from "@/lib/queries/reviews";
+import { submitReview, getDueCards, getReviewsForDeck } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
 import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play } from "lucide-react";
@@ -25,7 +25,6 @@ interface SavedProgress {
   cardIds: string[];
   correctCount: number;
   incorrectCount: number;
-  incorrectCardIds: string[];
 }
 
 function getStorageKey(deckId: string, mode: string) {
@@ -68,9 +67,11 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [submitting, setSubmitting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [incorrectCardIds, setIncorrectCardIds] = useState<string[]>([]);
+  const [isReasking, setIsReasking] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [pendingResume, setPendingResume] = useState<SavedProgress | null>(null);
   const [cardMap, setCardMap] = useState<Map<string, CardType>>(new Map());
+  const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set());
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -80,10 +81,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       } else {
         const all = await getCards(deck.id);
         if (mode === "learn") {
-          const newCards = all.filter((c) => !c.id);
-          cardsToUse = newCards.length > 0 ? newCards : all.slice(0, 20);
+          const reviews = await getReviewsForDeck(deck.id);
+          const reviewedIds = new Set(reviews.map((r) => r.card_id));
+          const freshCards = all.filter((c) => !reviewedIds.has(c.id));
+          cardsToUse = freshCards.length > 0 ? freshCards : all.slice(0, 20);
+          setNewCardIds(new Set(cardsToUse.map((c) => c.id)));
         } else {
           cardsToUse = all;
+          setNewCardIds(new Set());
         }
       }
 
@@ -100,16 +105,16 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         setCurrentIndex(Math.min(resume.currentIndex, finalCards.length - 1));
         setCorrectCount(resume.correctCount);
         setIncorrectCount(resume.incorrectCount);
-        setIncorrectCardIds(resume.incorrectCardIds || []);
       } else {
         setCards(cardsToUse);
         setCurrentIndex(0);
         setCorrectCount(0);
         setIncorrectCount(0);
-        setIncorrectCardIds([]);
       }
       setIsComplete(false);
       setFlipped(false);
+      setIncorrectCardIds([]);
+      setIsReasking(false);
     } catch (error) {
       console.error("Failed to load cards:", error);
     } finally {
@@ -122,7 +127,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   }, [loadCards]);
 
   useEffect(() => {
-    if (loading || cards.length === 0 || mode === "autoplay") return;
+    if (loading || cards.length === 0 || mode === "autoplay" || isReasking) return;
     const saved = loadProgressData(deck.id, mode);
     if (saved && saved.currentIndex < saved.cardIds.length - 1) {
       setPendingResume(saved);
@@ -130,10 +135,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     } else {
       clearProgressData(deck.id, mode);
     }
-  }, [deck.id, mode, loading, cards.length]);
+  }, [deck.id, mode, loading, cards.length, isReasking]);
 
   useEffect(() => {
-    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog && currentIndex < cards.length - 1) {
+    if (cards.length > 0 && mode !== "autoplay" && !showResumeDialog && !isReasking && currentIndex < cards.length - 1) {
       saveProgressData({
         deckId: deck.id,
         mode,
@@ -141,10 +146,9 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         cardIds: cards.map((c) => c.id),
         correctCount,
         incorrectCount,
-        incorrectCardIds,
       });
     }
-  }, [currentIndex, cards, mode, deck.id, correctCount, incorrectCount, incorrectCardIds, showResumeDialog]);
+  }, [currentIndex, cards, mode, deck.id, correctCount, incorrectCount, showResumeDialog, isReasking]);
 
   useEffect(() => {
     const progress = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
@@ -206,6 +210,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             .map((id) => cardMap.get(id))
             .filter(Boolean) as CardType[];
           if (reviewCards.length > 0) {
+            setIsReasking(true);
             setCards(reviewCards);
             setCurrentIndex(0);
             setFlipped(false);
@@ -300,6 +305,8 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   }
 
   const currentCard = cards[currentIndex];
+  const isCurrentNew = newCardIds.has(currentCard.id);
+  const isCurrentReask = isReasking;
 
   if (mode === "autoplay") {
     return (
@@ -375,9 +382,9 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               </Badge>
             </div>
           </div>
-          {incorrectCardIds.length > 0 && (
+          {isReasking && (
             <p className="text-xs text-muted-foreground mt-1">
-              {incorrectCardIds.length} card{incorrectCardIds.length !== 1 ? "s" : ""} to review again
+              Reviewing cards you missed
             </p>
           )}
         </div>
@@ -399,6 +406,18 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               style={{ backfaceVisibility: "hidden" }}
             >
               <CardContent className="text-center p-0">
+                <div className="flex justify-center gap-2 mb-4">
+                  {isCurrentNew && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      New
+                    </span>
+                  )}
+                  {isCurrentReask && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      Review
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground mb-4">
                   Tap to reveal answer
                 </p>
