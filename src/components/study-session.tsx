@@ -450,7 +450,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           </p>
         </div>
         {currentGame === "pair-it" && (
-          <PairIt key={gameKey} cards={cards} onComplete={handleGameComplete} onProgress={() => {}} />
+          <PairIt key={gameKey} cards={cards} onComplete={handleGameComplete} onProgress={() => {}} autoAdvance />
         )}
         {currentGame === "guess-it" && (
           <GuessIt
@@ -460,6 +460,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
             onProgress={() => {}}
+            autoAdvance
           />
         )}
         {currentGame === "recall-it" && (
@@ -470,6 +471,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
             onProgress={() => {}}
+            autoAdvance
           />
         )}
         {currentGame === "type-it" && (
@@ -480,6 +482,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             targetLanguage={deck.target_language}
             onComplete={handleGameComplete}
             onProgress={() => {}}
+            autoAdvance
           />
         )}
       </div>

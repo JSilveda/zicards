@@ -14,17 +14,26 @@ interface RecallItProps {
   targetLanguage: string;
   onComplete: () => void;
   onProgress?: (progress: number) => void;
+  autoAdvance?: boolean;
 }
 
 const TIMER_SECONDS = 5;
 
-export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: RecallItProps) {
+export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress, autoAdvance }: RecallItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [remembered, setRemembered] = useState(0);
   const [forgotten, setForgotten] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (isComplete && autoAdvance) {
+      const timer = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, autoAdvance, onComplete]);
+
   const [progress, setProgress] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const animRef = useRef<number | null>(null);

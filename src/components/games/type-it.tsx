@@ -15,9 +15,10 @@ interface TypeItProps {
   targetLanguage: string;
   onComplete: () => void;
   onProgress?: (progress: number) => void;
+  autoAdvance?: boolean;
 }
 
-export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: TypeItProps) {
+export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress, autoAdvance }: TypeItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [input, setInput] = useState("");
@@ -27,6 +28,14 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (isComplete && autoAdvance) {
+      const timer = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, autoAdvance, onComplete]);
+
   const [nativeLang, setNativeLang] = useState(sourceLanguage);
   const inputRef = useRef<HTMLInputElement>(null);
 

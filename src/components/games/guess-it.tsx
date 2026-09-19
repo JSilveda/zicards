@@ -14,15 +14,23 @@ interface GuessItProps {
   targetLanguage: string;
   onComplete: () => void;
   onProgress?: (progress: number) => void;
+  autoAdvance?: boolean;
 }
 
-export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress }: GuessItProps) {
+export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress, autoAdvance }: GuessItProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (isComplete && autoAdvance) {
+      const timer = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, autoAdvance, onComplete]);
 
   const shuffledCards = useMemo(() => [...cards].sort(() => Math.random() - 0.5), [cards]);
   const currentCard = shuffledCards[currentIndex];

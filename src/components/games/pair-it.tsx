@@ -11,6 +11,7 @@ interface PairItProps {
   cards: CardType[];
   onComplete: () => void;
   onProgress?: (progress: number) => void;
+  autoAdvance?: boolean;
 }
 
 interface WordItem {
@@ -21,7 +22,7 @@ interface WordItem {
   image_url?: string | null;
 }
 
-export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
+export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItProps) {
   const totalPairs = cards.length;
 
   const [usedIndices, setUsedIndices] = useState<Set<number>>(new Set());
@@ -33,6 +34,13 @@ export function PairIt({ cards, onComplete, onProgress }: PairItProps) {
   const [score, setScore] = useState(0);
   const [totalMatched, setTotalMatched] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (isComplete && autoAdvance) {
+      const timer = setTimeout(() => onComplete(), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, autoAdvance, onComplete]);
 
   const BLOCK_SIZE = 5;
 
