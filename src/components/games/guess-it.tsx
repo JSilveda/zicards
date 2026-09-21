@@ -54,6 +54,14 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
     }
   }, [currentIndex, currentCard, sourceLanguage]);
 
+  const progress = shuffledCards.length > 0
+    ? ((currentIndex + 1) / shuffledCards.length) * 100
+    : 0;
+
+  useEffect(() => {
+    onProgress?.(progress);
+  }, [progress, onProgress]);
+
   const handleSelect = (option: string) => {
     if (selected) return;
     setSelected(option);
@@ -95,14 +103,6 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
       </div>
     );
   }
-
-  const progress = shuffledCards.length > 0
-    ? ((currentIndex + 1) / shuffledCards.length) * 100
-    : 0;
-
-  useEffect(() => {
-    onProgress?.(progress);
-  }, [progress, onProgress]);
 
   return (
     <div className="max-w-lg mx-auto p-4">
