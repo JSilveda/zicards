@@ -105,7 +105,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const advanceRef = useRef<() => void>(() => {});
   const answersRef = useRef<Map<string, boolean>>(new Map());
   const shuffledOrderRef = useRef<string[]>([]);
-  const progressCheckedRef = useRef(false);
+  const savedProgressHandledRef = useRef(false);
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -187,17 +187,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           setGameIndex(0);
           setCards(batches[0] || []);
           setCurrentIndex(0);
-
-          saveProgressData({
-            deckId: deck.id,
-            mode,
-            batchIndex: 0,
-            phase: "flashcards",
-            batchCardIds: (batches[0] || []).map((c) => c.id),
-            totalCards: learnCards.length,
-            currentIndex: 0,
-            shuffledCardOrder: shuffledOrder,
-          });
         }
         setCorrectCount(0);
         setIncorrectCount(0);
@@ -246,13 +235,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       if (saved) {
         setPendingResume(saved);
         setShowResumeDialog(true);
+        return;
       }
     }
-    progressCheckedRef.current = true;
+    savedProgressHandledRef.current = true;
   }, [deck.id, mode, loading, isReasking, isComplete]);
 
   useEffect(() => {
-    if (!progressCheckedRef.current) return;
+    if (!savedProgressHandledRef.current) return;
     if (cards.length > 0 && mode === "learn" && !showResumeDialog && !isReasking && !isComplete) {
       saveProgressData({
         deckId: deck.id,
@@ -409,7 +399,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const handleResume = () => {
     setShowResumeDialog(false);
-    progressCheckedRef.current = true;
+    savedProgressHandledRef.current = true;
     if (pendingResume) {
       loadCards(pendingResume);
     }
@@ -418,7 +408,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const handleStartFresh = () => {
     setShowResumeDialog(false);
-    progressCheckedRef.current = true;
+    savedProgressHandledRef.current = true;
     clearProgressData(deck.id, mode);
     setPendingResume(null);
     loadCards();
