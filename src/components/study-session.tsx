@@ -104,10 +104,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
-      if (!resume) {
-        clearProgressData(deck.id, mode);
-      }
-
       if (mode === "review") {
         const dueCards = await getDueCards(deck.id);
         setCards(dueCards);
