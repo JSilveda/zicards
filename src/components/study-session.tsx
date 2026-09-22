@@ -105,6 +105,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const advanceRef = useRef<() => void>(() => {});
   const answersRef = useRef<Map<string, boolean>>(new Map());
   const shuffledOrderRef = useRef<string[]>([]);
+  const progressCheckedRef = useRef(false);
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -247,9 +248,11 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         setShowResumeDialog(true);
       }
     }
+    progressCheckedRef.current = true;
   }, [deck.id, mode, loading, isReasking, isComplete]);
 
   useEffect(() => {
+    if (!progressCheckedRef.current) return;
     if (cards.length > 0 && mode === "learn" && !showResumeDialog && !isReasking && !isComplete) {
       saveProgressData({
         deckId: deck.id,
@@ -406,6 +409,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const handleResume = () => {
     setShowResumeDialog(false);
+    progressCheckedRef.current = true;
     if (pendingResume) {
       loadCards(pendingResume);
     }
@@ -414,6 +418,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const handleStartFresh = () => {
     setShowResumeDialog(false);
+    progressCheckedRef.current = true;
     clearProgressData(deck.id, mode);
     setPendingResume(null);
     loadCards();
