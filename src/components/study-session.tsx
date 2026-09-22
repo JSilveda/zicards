@@ -32,6 +32,7 @@ interface SavedProgress {
   batchCardIds: string[];
   totalCards: number;
   currentIndex: number;
+  shuffledCardOrder: string[];
 }
 
 const BATCH_SIZE = 5;
@@ -103,6 +104,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const batchesRef = useRef<CardType[][]>([]);
   const advanceRef = useRef<() => void>(() => {});
   const answersRef = useRef<Map<string, boolean>>(new Map());
+  const shuffledOrderRef = useRef<string[]>([]);
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -147,13 +149,27 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         for (const c of learnCards) map.set(c.id, c);
         setCardMap(map);
 
-        const shuffled = shuffleArray(learnCards);
+        let orderedCards: CardType[];
+        if (resume?.shuffledCardOrder && resume.shuffledCardOrder.length > 0) {
+          orderedCards = resume.shuffledCardOrder
+            .map((id) => map.get(id))
+            .filter(Boolean) as CardType[];
+          const existingIds = new Set(orderedCards.map((c) => c.id));
+          const missing = learnCards.filter((c) => !existingIds.has(c.id));
+          if (missing.length > 0) orderedCards.push(...missing);
+        } else {
+          orderedCards = shuffleArray(learnCards);
+        }
+
         const batches: CardType[][] = [];
-        for (let i = 0; i < shuffled.length; i += BATCH_SIZE) {
-          batches.push(shuffled.slice(i, i + BATCH_SIZE));
+        for (let i = 0; i < orderedCards.length; i += BATCH_SIZE) {
+          batches.push(orderedCards.slice(i, i + BATCH_SIZE));
         }
         batchesRef.current = batches;
         setTotalBatches(batches.length);
+
+        const shuffledOrder = orderedCards.map((c) => c.id);
+        shuffledOrderRef.current = shuffledOrder;
 
         if (resume) {
           const resBatchCards = resume.batchCardIds
@@ -170,6 +186,17 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           setGameIndex(0);
           setCards(batches[0] || []);
           setCurrentIndex(0);
+
+          saveProgressData({
+            deckId: deck.id,
+            mode,
+            batchIndex: 0,
+            phase: "flashcards",
+            batchCardIds: (batches[0] || []).map((c) => c.id),
+            totalCards: learnCards.length,
+            currentIndex: 0,
+            shuffledCardOrder: shuffledOrder,
+          });
         }
         setCorrectCount(0);
         setIncorrectCount(0);
@@ -232,6 +259,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         batchCardIds: cards.map((c) => c.id),
         totalCards: allCards.length,
         currentIndex,
+        shuffledCardOrder: shuffledOrderRef.current,
       });
     }
   }, [currentIndex, cards, mode, deck.id, batchIndex, phase, showResumeDialog, isReasking, isComplete, allCards.length]);
