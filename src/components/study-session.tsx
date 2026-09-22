@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
-import { submitReview, getDueCards, getReviewsForDeck } from "@/lib/queries/reviews";
+import { submitReview, getDueCards, getReviewsForDeck, ensureReviewsExist } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
 import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play } from "lucide-react";
@@ -102,6 +102,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const batchesRef = useRef<CardType[][]>([]);
   const advanceRef = useRef<() => void>(() => {});
+  const answersRef = useRef<Map<string, boolean>>(new Map());
 
   const loadCards = useCallback(async (resume?: SavedProgress) => {
     try {
@@ -197,6 +198,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       setIsReasking(false);
       if (!resume) {
         setAnsweredCardIds(new Set());
+        answersRef.current.clear();
       }
     } catch (error) {
       console.error("Failed to load cards:", error);
@@ -284,8 +286,15 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       setIncorrectCardIds([]);
       setIsReasking(false);
     } else {
-      clearProgressData(deck.id, mode);
-      setIsComplete(true);
+      const answers = new Map(answersRef.current);
+      answersRef.current.clear();
+      ensureReviewsExist(deck.id, answers).then(() => {
+        clearProgressData(deck.id, mode);
+        setIsComplete(true);
+      }).catch(() => {
+        clearProgressData(deck.id, mode);
+        setIsComplete(true);
+      });
     }
   };
 
@@ -301,6 +310,8 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     } catch (error) {
       console.error("Failed to submit review:", error);
     }
+
+    answersRef.current.set(currentCard.id, correct);
 
     const newCorrectCount = correct ? correctCount + 1 : correctCount;
     const newIncorrectCount = correct ? incorrectCount : incorrectCount + 1;

@@ -76,7 +76,7 @@ export async function getDueCards(deckId: string) {
   return dueCards;
 }
 
-export async function submitReview(
+async function submitReviewOnce(
   cardId: string,
   correct: boolean
 ): Promise<Review> {
@@ -127,6 +127,57 @@ export async function submitReview(
 
     if (error) throw error;
     return data as Review;
+  }
+}
+
+export async function submitReview(
+  cardId: string,
+  correct: boolean,
+  maxRetries = 2
+): Promise<Review> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await submitReviewOnce(cardId, correct);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
+export async function ensureReviewsExist(
+  deckId: string,
+  answers: Map<string, boolean>
+): Promise<void> {
+  if (answers.size === 0) return;
+
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const cardIds = Array.from(answers.keys());
+
+  const { data: existingReviews } = await supabase
+    .from("reviews")
+    .select("card_id")
+    .in("card_id", cardIds)
+    .eq("user_id", user.id);
+
+  const reviewedIds = new Set((existingReviews || []).map((r: { card_id: string }) => r.card_id));
+
+  for (const cardId of cardIds) {
+    if (!reviewedIds.has(cardId)) {
+      const correct = answers.get(cardId) ?? false;
+      try {
+        await submitReview(cardId, correct);
+      } catch (error) {
+        console.error(`Failed to sync review for card ${cardId}:`, error);
+      }
+    }
   }
 }
 
