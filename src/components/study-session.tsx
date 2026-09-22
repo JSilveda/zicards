@@ -31,6 +31,7 @@ interface SavedProgress {
   phase: string;
   batchCardIds: string[];
   totalCards: number;
+  currentIndex: number;
 }
 
 const BATCH_SIZE = 5;
@@ -161,13 +162,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           setPhase(resume.phase as "flashcards" | "games");
           setGameIndex(0);
           setCards(resBatchCards.length > 0 ? resBatchCards : batches[0] || []);
+          setCurrentIndex(resume.currentIndex ?? 0);
         } else {
           setBatchIndex(0);
           setPhase("flashcards");
           setGameIndex(0);
           setCards(batches[0] || []);
+          setCurrentIndex(0);
         }
-        setCurrentIndex(0);
         setCorrectCount(0);
         setIncorrectCount(0);
       } else {
@@ -227,6 +229,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         phase,
         batchCardIds: cards.map((c) => c.id),
         totalCards: allCards.length,
+        currentIndex,
       });
     }
   }, [currentIndex, cards, mode, deck.id, batchIndex, phase, showResumeDialog, isReasking, isComplete, allCards.length]);
