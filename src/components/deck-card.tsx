@@ -202,7 +202,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowMenu(false);
-                          router.push(`/import`);
+                          router.push(`/import?deck=${deck.id}`);
                         }}
                       >
                         <Upload className="h-4 w-4" />

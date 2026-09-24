@@ -1,98 +1,40 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { createCards } from "@/lib/queries/cards";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle } from "lucide-react";
+import { createCards, getCards } from "@/lib/queries/cards";
+import {
+  parseCardsCSV,
+  parseBackupFile,
+  cardsToCSV,
+  downloadFile,
+  safeFilename,
+  todayStamp,
+  type BackupCard,
+} from "@/lib/import-export";
+import { Upload, FileSpreadsheet, FileJson, AlertCircle, CheckCircle, Download } from "lucide-react";
 
 interface ImportExportProps {
   deckId: string;
+  deckName?: string;
   onImportComplete?: () => void;
 }
 
-interface ParsedCard {
-  front: string;
-  back: string;
-  example?: string;
-  transcription?: string;
-  gender?: string;
-  image_url?: string;
-}
-
-export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [parsedCards, setParsedCards] = useState<ParsedCard[]>([]);
+export function ImportExport({ deckId, deckName, onImportComplete }: ImportExportProps) {
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [parsedCards, setParsedCards] = useState<BackupCard[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  const parseCSV = useCallback((text: string): ParsedCard[] => {
-    const lines = text.split("\n").filter((l) => l.trim());
-    if (lines.length < 2) {
-      setErrors(["File must have a header row and at least one data row"]);
-      return [];
-    }
-
-    const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
-    const requiredCols = ["front", "back"];
-    const missingCols = requiredCols.filter((c) => !header.includes(c));
-
-    if (missingCols.length > 0) {
-      setErrors([`Missing required columns: ${missingCols.join(", ")}`]);
-      return [];
-    }
-
-    const cards: ParsedCard[] = [];
-    const newErrors: string[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.trim());
-      if (values.length < 2 || (!values[0] && !values[1])) continue;
-
-      const card: ParsedCard = {
-        front: values[header.indexOf("front")] || "",
-        back: values[header.indexOf("back")] || "",
-      };
-
-      const exampleIdx = header.indexOf("example");
-      if (exampleIdx >= 0 && values[exampleIdx]) {
-        card.example = values[exampleIdx];
-      }
-
-      const transcriptionIdx = header.indexOf("transcription");
-      if (transcriptionIdx >= 0 && values[transcriptionIdx]) {
-        card.transcription = values[transcriptionIdx];
-      }
-
-      const genderIdx = header.indexOf("gender");
-      if (genderIdx >= 0 && values[genderIdx]) {
-        card.gender = values[genderIdx];
-      }
-
-      const imageUrlIdx = header.indexOf("image_url");
-      if (imageUrlIdx >= 0 && values[imageUrlIdx]) {
-        card.image_url = values[imageUrlIdx];
-      }
-
-      if (card.front && card.back) {
-        cards.push(card);
-      } else {
-        newErrors.push(`Row ${i + 1}: Missing front or back value`);
-      }
-    }
-
-    setErrors(newErrors);
-    return cards;
-  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    setFile(selected);
+    setFileName(selected.name);
     setParsedCards([]);
     setErrors([]);
     setSuccess(false);
@@ -100,8 +42,23 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const parsed = parseCSV(text);
-      setParsedCards(parsed);
+      try {
+        if (/\.json$/i.test(selected.name)) {
+          const backup = parseBackupFile(text);
+          const cards = backup.decks.flatMap((d) => d.cards);
+          if (cards.length === 0) {
+            setErrors(["El JSON no contiene cartas"]);
+          } else {
+            setParsedCards(cards);
+          }
+        } else {
+          const { cards, errors } = parseCardsCSV(text);
+          setErrors(errors);
+          setParsedCards(cards);
+        }
+      } catch (err) {
+        setErrors([err instanceof Error ? err.message : "No se pudo leer el archivo"]);
+      }
     };
     reader.readAsText(selected);
   };
@@ -111,36 +68,85 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
 
     setImporting(true);
     try {
-      await createCards(
-        parsedCards.map((card) => ({
-          deck_id: deckId,
-          ...card,
-          example: card.example || null,
-          transcription: card.transcription || null,
-          gender: card.gender || null,
-          image_url: card.image_url || null,
-        }))
-      );
+      const CHUNK = 200;
+      for (let i = 0; i < parsedCards.length; i += CHUNK) {
+        await createCards(
+          parsedCards.slice(i, i + CHUNK).map((card) => ({
+            deck_id: deckId,
+            front: card.front,
+            back: card.back,
+            example: card.example || null,
+            transcription: card.transcription || null,
+            gender: card.gender || null,
+            image_url: card.image_url || null,
+          }))
+        );
+      }
       setSuccess(true);
       setParsedCards([]);
-      setFile(null);
+      setFileName(null);
       onImportComplete?.();
     } catch (error) {
-      setErrors(["Failed to import cards. Please try again."]);
+      console.error("Failed to import cards:", error);
+      setErrors(["No se pudieron importar las cartas. Inténtalo de nuevo."]);
     } finally {
       setImporting(false);
     }
   };
 
-  const handleExport = () => {
-    const headers = ["front", "back", "example", "transcription", "gender", "image_url"];
-    const csvContent = [headers.join(",")].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `deck-export-${deckId}.csv`;
-    link.click();
+  const handleExport = async (format: "csv" | "json") => {
+    setExporting(true);
+    try {
+      const cards = await getCards(deckId);
+      const base = safeFilename(deckName || `deck-${deckId.slice(0, 8)}`);
+      if (format === "csv") {
+        downloadFile(
+          `${base}-${todayStamp()}.csv`,
+          cardsToCSV(
+            cards.map((c) => ({
+              front: c.front,
+              back: c.back,
+              example: c.example || undefined,
+              transcription: c.transcription || undefined,
+              gender: c.gender || undefined,
+              image_url: c.image_url || undefined,
+            }))
+          ),
+          "text/csv"
+        );
+      } else {
+        const { buildBackupFile } = await import("@/lib/import-export");
+        const backup = buildBackupFile(
+          [],
+          [
+            {
+              deck: {
+                name: deckName || base,
+                source_language: "en",
+                target_language: "es",
+                description: null,
+                is_public: false,
+                folder_id: null,
+              },
+              cards: cards.map((c) => ({
+                front: c.front,
+                back: c.back,
+                example: c.example,
+                transcription: c.transcription,
+                gender: c.gender,
+                image_url: c.image_url,
+              })),
+            },
+          ]
+        );
+        downloadFile(`${base}-${todayStamp()}.json`, JSON.stringify(backup, null, 2), "application/json");
+      }
+    } catch (error) {
+      console.error("Failed to export:", error);
+      setErrors(["No se pudo exportar. Inténtalo de nuevo."]);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -149,23 +155,27 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Import Cards from CSV
+            Importar cartas (CSV o JSON)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground">
-            <p className="mb-2">Required columns: <code className="bg-muted px-1 rounded">front</code>, <code className="bg-muted px-1 rounded">back</code></p>
-            <p>Optional columns: <code className="bg-muted px-1 rounded">example</code>, <code className="bg-muted px-1 rounded">transcription</code>, <code className="bg-muted px-1 rounded">gender</code>, <code className="bg-muted px-1 rounded">image_url</code></p>
+            <p className="mb-1">
+              CSV: columnas requeridas <code className="bg-muted px-1 rounded">front</code>,{" "}
+              <code className="bg-muted px-1 rounded">back</code>; opcionales{" "}
+              <code className="bg-muted px-1 rounded">example</code>,{" "}
+              <code className="bg-muted px-1 rounded">transcription</code>,{" "}
+              <code className="bg-muted px-1 rounded">gender</code>,{" "}
+              <code className="bg-muted px-1 rounded">image_url</code>
+            </p>
+            <p>JSON: archivo de backup de ZiCards (se importan sus cartas a este deck).</p>
           </div>
 
-          <Input
-            type="file"
-            accept=".csv,.tsv"
-            onChange={handleFileChange}
-          />
+          <Input type="file" accept=".csv,.tsv,.txt,.json" onChange={handleFileChange} />
+          {fileName && <p className="text-xs text-muted-foreground">Archivo: {fileName}</p>}
 
           {errors.length > 0 && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
               {errors.map((error, i) => (
                 <p key={i} className="text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -178,7 +188,7 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
           {parsedCards.length > 0 && (
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-sm font-medium mb-1">
-                {parsedCards.length} cards ready to import
+                {parsedCards.length} cartas listas para importar
               </p>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {parsedCards.slice(0, 10).map((card, i) => (
@@ -188,7 +198,7 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
                 ))}
                 {parsedCards.length > 10 && (
                   <p className="text-xs text-muted-foreground">
-                    ...and {parsedCards.length - 10} more
+                    ...y {parsedCards.length - 10} más
                   </p>
                 )}
               </div>
@@ -199,23 +209,50 @@ export function ImportExport({ deckId, onImportComplete }: ImportExportProps) {
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
               <p className="text-sm text-green-600 flex items-center gap-1">
                 <CheckCircle className="h-4 w-4" />
-                Cards imported successfully!
+                ¡Cartas importadas correctamente!
               </p>
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleImport}
               disabled={parsedCards.length === 0 || importing}
               className="gap-2"
             >
               <Upload className="h-4 w-4" />
-              {importing ? "Importing..." : "Import Cards"}
+              {importing ? "Importando..." : "Importar cartas"}
             </Button>
-            <Button variant="outline" onClick={handleExport} className="gap-2">
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Exportar este deck
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleExport("csv")}
+              disabled={exporting}
+              className="gap-2"
+            >
               <FileSpreadsheet className="h-4 w-4" />
-              Export CSV
+              Exportar CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleExport("json")}
+              disabled={exporting}
+              className="gap-2"
+            >
+              <FileJson className="h-4 w-4" />
+              Exportar JSON
             </Button>
           </div>
         </CardContent>
