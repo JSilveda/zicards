@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, RotateCcw, Volume2, CheckCircle, XCircle, Eye } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import { TermText } from "@/components/term-text";
+import { toPlainText, parseSegments, extractTerms } from "@/lib/terms";
 import type { Card as CardType } from "@/types";
 
 interface TypeItProps {
@@ -18,11 +20,54 @@ interface TypeItProps {
   autoAdvance?: boolean;
 }
 
+function TermInput({
+  value,
+  status,
+  inputRef,
+  onChange,
+}: {
+  value: string;
+  status: boolean | null;
+  inputRef?: React.Ref<HTMLInputElement>;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <span className="relative inline-flex">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="…"
+        className={`h-12 w-32 text-center text-lg ${
+          status === true
+            ? "border-green-500 bg-green-50 dark:bg-green-900/20"
+            : status === false
+            ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+            : ""
+        }`}
+        disabled={status !== null}
+        autoComplete="off"
+      />
+      {status !== null && (
+        <span className="absolute -right-2 -top-2 rounded-full bg-card">
+          {status ? (
+            <CheckCircle className="h-5 w-5 text-green-500" />
+          ) : (
+            <XCircle className="h-5 w-5 text-red-500" />
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onProgress, autoAdvance }: TypeItProps) {
   const [queue] = useState(() => [...cards].sort(() => Math.random() - 0.5));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  const [inputs, setInputs] = useState<string[]>([]);
+  const [checked, setChecked] = useState<boolean[] | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -66,20 +111,41 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
   const shownLang = showSideIsTarget ? targetLanguage : sourceLanguage;
   const answerLang = showSideIsTarget ? sourceLanguage : targetLanguage;
 
+  // Terms on the answer side -> one input per term (e.g. "{swim}, {swam}, {swum}")
+  const answerTerms = useMemo(() => extractTerms(correctAnswer ?? ""), [correctAnswer]);
+  const answerSegments = useMemo(() => parseSegments(correctAnswer ?? ""), [correctAnswer]);
+  const isMultiTerm = answerTerms.length > 0;
+
   const progress = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
 
   useEffect(() => {
     onProgress?.(progress);
   }, [progress, onProgress]);
 
+  const multiFirstRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (currentCard && !showHelp) {
-      inputRef.current?.focus();
+      if (isMultiTerm) {
+        multiFirstRef.current?.focus();
+      } else {
+        inputRef.current?.focus();
+      }
     }
-  }, [currentIndex, currentCard, showHelp]);
+  }, [currentIndex, currentCard, showHelp, isMultiTerm]);
+
+  // Reset per-term inputs when moving to another card
+  useEffect(() => {
+    setInputs(answerTerms.map(() => ""));
+    setChecked(null);
+  }, [currentIndex, answerTerms.length]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isMultiTerm) {
+      handleSubmitMulti();
+      return;
+    }
     if (!input.trim() || feedback || !correctAnswer) return;
 
     const userAnswer = input.trim().toLowerCase();
@@ -97,6 +163,26 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
     }, 1500);
   };
 
+  const handleSubmitMulti = () => {
+    if (checked || !correctAnswer) return;
+    if (inputs.length !== answerTerms.length || inputs.some((v) => !v.trim())) return;
+
+    const results = inputs.map(
+      (v, i) => v.trim().toLowerCase() === answerTerms[i].toLowerCase()
+    );
+    setChecked(results);
+    if (results.every(Boolean)) {
+      setScore((s) => s + 20);
+      setCorrectCount((c) => c + 1);
+    } else {
+      setWrongCount((w) => w + 1);
+    }
+
+    setTimeout(() => {
+      goToNext();
+    }, 1500);
+  };
+
   const goToNext = () => {
     if (currentIndex + 1 >= queue.length) {
       setIsComplete(true);
@@ -104,6 +190,8 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
       setCurrentIndex((i) => i + 1);
       setInput("");
       setFeedback(null);
+      setInputs([]);
+      setChecked(null);
       setShowHelp(false);
     }
   };
@@ -119,7 +207,13 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
     setShowHelp(false);
     setInput("");
     setFeedback(null);
-    inputRef.current?.focus();
+    setInputs(answerTerms.map(() => ""));
+    setChecked(null);
+    if (isMultiTerm) {
+      multiFirstRef.current?.focus();
+    } else {
+      inputRef.current?.focus();
+    }
   };
 
   if (isComplete || !currentCard) {
@@ -166,11 +260,13 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
               {currentCard.image_url && (
                 <img
                   src={currentCard.image_url}
-                  alt={correctAnswer || ""}
+                  alt={toPlainText(correctAnswer || "")}
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-2 text-primary">{correctAnswer}</h2>
+              <h2 className="text-3xl font-bold mb-2 text-primary">
+                <TermText text={correctAnswer || ""} />
+              </h2>
               {currentCard.example && (
                 <p className="text-sm text-muted-foreground italic mb-2 max-w-xs">
                   &quot;{currentCard.example}&quot;
@@ -191,11 +287,13 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
               {currentCard.image_url && (
                 <img
                   src={currentCard.image_url}
-                  alt={shownText || ""}
+                  alt={toPlainText(shownText || "")}
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-1">{shownText}</h2>
+              <h2 className="text-3xl font-bold mb-1">
+                <TermText text={shownText || ""} />
+              </h2>
               <Button
                 variant="ghost"
                 size="sm"
@@ -220,6 +318,72 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
             Skip
           </Button>
         </div>
+      ) : isMultiTerm ? (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {(() => {
+              let termIdx = -1;
+              return answerSegments.map((seg, i) => {
+                if (seg.type !== "term") {
+                  return (
+                    <span key={i} className="text-muted-foreground">
+                      {seg.value}
+                    </span>
+                  );
+                }
+                termIdx++;
+                const idx = termIdx;
+                return (
+                  <TermInput
+                    key={i}
+                    value={inputs[idx] ?? ""}
+                    status={checked ? checked[idx] ?? null : null}
+                    inputRef={idx === 0 ? multiFirstRef : undefined}
+                    onChange={(v) =>
+                      setInputs((prev) => {
+                        const next = [...prev];
+                        next[idx] = v;
+                        return next;
+                      })
+                    }
+                  />
+                );
+              });
+            })()}
+          </div>
+
+          {checked && !checked.every(Boolean) && (
+            <p className="text-sm text-center">
+              Correct answer:{" "}
+              <strong className="text-primary">
+                <TermText text={correctAnswer || ""} />
+              </strong>
+            </p>
+          )}
+
+          {!checked && (
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="lg"
+                className="flex-1"
+                disabled={inputs.length !== answerTerms.length || inputs.some((v) => !v.trim())}
+              >
+                Check
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="gap-2"
+                onClick={handleHelp}
+              >
+                <Eye className="h-5 w-5" />
+                Help
+              </Button>
+            </div>
+          )}
+        </form>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
@@ -251,7 +415,10 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
 
           {feedback === "wrong" && (
             <p className="text-sm text-center">
-              Correct answer: <strong className="text-primary">{correctAnswer}</strong>
+              Correct answer:{" "}
+              <strong className="text-primary">
+                <TermText text={correctAnswer || ""} />
+              </strong>
             </p>
           )}
 

@@ -1,3 +1,5 @@
+import { toPlainText } from "./terms";
+
 let voicesLoaded = false;
 
 function ensureVoicesLoaded(): Promise<SpeechSynthesisVoice[]> {
@@ -50,6 +52,9 @@ export async function speak(text: string, lang: string = "en-US") {
       return;
     }
 
+    // Never speak chip delimiters: "{swim}, {swam}" -> "swim, swam"
+    text = toPlainText(text);
+
     window.speechSynthesis.cancel();
 
     const voices = await ensureVoicesLoaded();
@@ -74,6 +79,9 @@ export async function speakWithVoice(text: string, voiceUri: string) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
+
+    // Never speak chip delimiters: "{swim}, {swam}" -> "swim, swam"
+    text = toPlainText(text);
 
     window.speechSynthesis.cancel();
 

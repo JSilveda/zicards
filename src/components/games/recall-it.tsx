@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, RotateCcw, Volume2, Eye } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import { TermText } from "@/components/term-text";
+import { toPlainText } from "@/lib/terms";
 import type { Card as CardType } from "@/types";
 
 interface RecallItProps {
@@ -163,11 +165,13 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
           {currentCard.image_url && (
             <img
               src={currentCard.image_url}
-              alt={currentCard.front}
+              alt={toPlainText(currentCard.front)}
               className="max-h-28 rounded-lg object-cover mb-3"
             />
           )}
-          <h2 className="text-4xl font-bold mb-2">{currentCard.front}</h2>
+          <h2 className="text-4xl font-bold mb-2">
+            <TermText text={currentCard.front} />
+          </h2>
           {currentCard.transcription && (
             <p className="text-muted-foreground mb-2">/{currentCard.transcription}/</p>
           )}
@@ -238,10 +242,14 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
               </button>
             ) : (
               <div className="flex flex-col items-center justify-center w-full h-full">
-                <h3 className="text-3xl font-bold text-primary">{currentCard.back}</h3>
+                <h3 className="text-3xl font-bold text-primary">
+                  <TermText text={currentCard.back} />
+                </h3>
                 {currentCard.example && (
                   <p className="text-sm text-muted-foreground italic mt-2 max-w-[280px] text-center">
-                    &quot;{currentCard.example}&quot;
+                    &quot;
+                    <TermText text={currentCard.example} />
+                    &quot;
                   </p>
                 )}
               </div>

@@ -169,6 +169,9 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
               <code className="bg-muted px-1 rounded">image_url</code>
             </p>
             <p>JSON: archivo de backup de ZiCards (se importan sus cartas a este deck).</p>
+            <p>
+              Tip: usa {"{término}"} para mostrar etiquetas, ej. {"{swim}, {swam}, {swum}"}.
+            </p>
           </div>
 
           <Input type="file" accept=".csv,.tsv,.txt,.json" onChange={handleFileChange} />

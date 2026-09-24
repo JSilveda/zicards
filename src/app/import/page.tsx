@@ -805,6 +805,34 @@ function ImportExportPage() {
 
                 <Card>
                   <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Términos con {"{llaves}"}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p className="text-muted-foreground">
+                      Envuelve palabras en {"{llaves}"} en cualquier campo (front, back, example) y
+                      se mostrarán como etiquetas al estudiar. Funciona igual en CSV y JSON porque
+                      es texto plano. Ejemplo para verbos irregulares:
+                    </p>
+                    <pre className="bg-muted rounded-lg p-3 text-xs overflow-x-auto">
+                      {`front,back\nNadar,"{swim}, {swam}, {swum}"`}
+                    </pre>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                      <li>En el juego de escritura aparece un campo por cada término.</li>
+                      <li>
+                        La voz (TTS) lee los términos sin llaves. Si necesitas llaves literales
+                        (p. ej. estudiando código), escríbelas como{" "}
+                        <code className="bg-muted px-1 rounded">{"\\{"}</code> y{" "}
+                        <code className="bg-muted px-1 rounded">{"\\}"}</code>.
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
                     <CardTitle>Cómo importar paso a paso</CardTitle>
                   </CardHeader>
                   <CardContent className="text-sm text-muted-foreground space-y-2">

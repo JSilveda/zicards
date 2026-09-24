@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, RotateCcw, CheckCircle } from "lucide-react";
+import { TermText } from "@/components/term-text";
 import type { Card as CardType } from "@/types";
 
 interface PairItProps {
@@ -195,10 +196,10 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
                 {isMatched ? (
                   <span className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
-                    {item.text}
+                    <TermText text={item.text} />
                   </span>
                 ) : (
-                  item.text
+                  <TermText text={item.text} />
                 )}
               </button>
             );
@@ -230,10 +231,10 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
                 {isMatched ? (
                   <span className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
-                    {item.text}
+                    <TermText text={item.text} />
                   </span>
                 ) : (
-                  item.text
+                  <TermText text={item.text} />
                 )}
               </button>
             );

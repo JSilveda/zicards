@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, RotateCcw, Volume2 } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import { TermText } from "@/components/term-text";
+import { toPlainText } from "@/lib/terms";
 import type { Card as CardType } from "@/types";
 
 interface GuessItProps {
@@ -123,12 +125,14 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
           {currentCard.image_url && (
             <img
               src={currentCard.image_url}
-              alt={currentCard.front}
+              alt={toPlainText(currentCard.front)}
               className="max-h-32 rounded-lg object-cover mb-4"
             />
           )}
           <p className="text-sm text-muted-foreground mb-2">What is the translation of:</p>
-          <h2 className="text-3xl font-bold mb-4">{currentCard.front}</h2>
+          <h2 className="text-3xl font-bold mb-4">
+            <TermText text={currentCard.front} />
+          </h2>
           <Button
             variant="ghost"
             size="sm"
@@ -158,7 +162,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
               disabled={!!selected}
               className={`p-4 rounded-xl border-2 font-medium transition-all ${style}`}
             >
-              {option}
+              <TermText text={option} />
             </button>
           );
         })}

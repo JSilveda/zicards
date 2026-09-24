@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import { TermText } from "@/components/term-text";
+import { toPlainText } from "@/lib/terms";
 import { Volume2, Edit, Trash2, RotateCcw, MoreHorizontal } from "lucide-react";
 import type { Card as FlashCardType } from "@/types";
 
@@ -116,7 +118,9 @@ export function FlashCard({
                 </div>
               )}
               <p className="text-xs text-muted-foreground mb-2">Tap to flip</p>
-              <h2 className="text-2xl font-bold mb-2">{card.front}</h2>
+              <h2 className="text-2xl font-bold mb-2">
+                <TermText text={card.front} />
+              </h2>
               {card.transcription && (
                 <p className="text-xs text-muted-foreground mb-1">
                   /{card.transcription}/
@@ -130,7 +134,7 @@ export function FlashCard({
               {card.image_url && (
                 <img
                   src={card.image_url}
-                  alt={card.front}
+                  alt={toPlainText(card.front)}
                   className="mx-auto mt-2 max-h-20 rounded-lg object-cover"
                 />
               )}
@@ -156,10 +160,14 @@ export function FlashCard({
           >
             <CardContent className="text-center p-0 w-full">
               <p className="text-xs text-muted-foreground mb-2">Tap to flip back</p>
-              <h2 className="text-2xl font-bold mb-2">{card.back}</h2>
+              <h2 className="text-2xl font-bold mb-2">
+                <TermText text={card.back} />
+              </h2>
               {card.example && (
                 <p className="text-xs text-muted-foreground italic mb-2 max-w-xs">
-                  &quot;{card.example}&quot;
+                  &quot;
+                  <TermText text={card.example} />
+                  &quot;
                 </p>
               )}
               <Button

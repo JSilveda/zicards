@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
+import { TermText } from "@/components/term-text";
+import { toPlainText } from "@/lib/terms";
 import { submitReview, getDueCards, getReviewsForDeck, ensureReviewsExist } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
@@ -564,18 +566,24 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             {currentCard.image_url && (
               <img
                 src={currentCard.image_url}
-                alt={currentCard.front}
+                alt={toPlainText(currentCard.front)}
                 className="max-h-36 rounded-lg object-cover mx-auto mb-4"
               />
             )}
             <p className="text-sm text-muted-foreground mb-2">Front</p>
-            <h2 className="text-4xl font-bold mb-4">{currentCard.front}</h2>
+            <h2 className="text-4xl font-bold mb-4">
+              <TermText text={currentCard.front} />
+            </h2>
             <div className="h-px bg-border w-32 mx-auto my-4" />
             <p className="text-sm text-muted-foreground mb-2">Back</p>
-            <h2 className="text-3xl font-bold text-primary">{currentCard.back}</h2>
+            <h2 className="text-3xl font-bold text-primary">
+              <TermText text={currentCard.back} />
+            </h2>
             {currentCard.example && (
               <p className="text-sm text-muted-foreground italic mt-4 max-w-sm mx-auto">
-                &quot;{currentCard.example}&quot;
+                &quot;
+                <TermText text={currentCard.example} />
+                &quot;
               </p>
             )}
           </CardContent>
@@ -663,11 +671,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 {currentCard.image_url && (
                   <img
                     src={currentCard.image_url}
-                    alt={currentCard.front}
+                    alt={toPlainText(currentCard.front)}
                     className="max-h-36 rounded-lg object-cover mx-auto mb-4"
                   />
                 )}
-                <h2 className="text-4xl font-bold mb-3">{currentCard.front}</h2>
+                <h2 className="text-4xl font-bold mb-3">
+                  <TermText text={currentCard.front} />
+                </h2>
                 {currentCard.transcription && (
                   <p className="text-muted-foreground mb-2">
                     /{currentCard.transcription}/
@@ -700,14 +710,18 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 {currentCard.image_url && (
                   <img
                     src={currentCard.image_url}
-                    alt={currentCard.back}
+                    alt={toPlainText(currentCard.back)}
                     className="max-h-36 rounded-lg object-cover mx-auto mb-4"
                   />
                 )}
-                <h2 className="text-4xl font-bold mb-3">{currentCard.back}</h2>
+                <h2 className="text-4xl font-bold mb-3">
+                  <TermText text={currentCard.back} />
+                </h2>
                 {currentCard.example && (
                   <p className="text-muted-foreground italic mb-4 max-w-sm">
-                    &quot;{currentCard.example}&quot;
+                    &quot;
+                    <TermText text={currentCard.example} />
+                    &quot;
                   </p>
                 )}
                 <Button

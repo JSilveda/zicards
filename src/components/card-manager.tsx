@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
-import { Plus, Image, ArrowUpDown } from "lucide-react";
+import { Plus, Image, ArrowUpDown, Braces } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
 interface CardManagerProps {
@@ -38,6 +38,44 @@ export function CardManager({
     gender: "",
     image_url: "",
   });
+  const frontRef = useRef<HTMLInputElement>(null);
+  const backRef = useRef<HTMLInputElement>(null);
+  const exampleRef = useRef<HTMLTextAreaElement>(null);
+
+  const wrapSelection = (
+    ref: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
+    field: "front" | "back" | "example"
+  ) => {
+    const el = ref.current;
+    if (!el) return;
+    const value = form[field];
+    const start = el.selectionStart ?? value.length;
+    const end = el.selectionEnd ?? value.length;
+    const selected = value.slice(start, end);
+    setForm({ ...form, [field]: `${value.slice(0, start)}{${selected}}${value.slice(end)}` });
+    requestAnimationFrame(() => {
+      el.focus();
+      const cursor = start + 1;
+      el.setSelectionRange(cursor, cursor + selected.length);
+    });
+  };
+
+  const wrapButton = (
+    ref: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
+    field: "front" | "back" | "example"
+  ) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 gap-1 text-xs"
+      title="Envolver la selección en {término}"
+      onClick={() => wrapSelection(ref, field)}
+    >
+      <Braces className="h-3.5 w-3.5" />
+      {"{ }"}
+    </Button>
+  );
 
   const loadCards = useCallback(async () => {
     try {
@@ -207,24 +245,40 @@ export function CardManager({
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Front *</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Front *</label>
+                {wrapButton(frontRef, "front")}
+              </div>
               <Input
+                ref={frontRef}
                 value={form.front}
                 onChange={(e) => setForm({ ...form, front: e.target.value })}
                 placeholder="Word or phrase"
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Back (Translation) *</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Back (Translation) *</label>
+                {wrapButton(backRef, "back")}
+              </div>
               <Input
+                ref={backRef}
                 value={form.back}
                 onChange={(e) => setForm({ ...form, back: e.target.value })}
                 placeholder="Translation"
               />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Tip: envuelve términos en {"{llaves}"} para verlos como etiquetas, ej.{" "}
+                {"{swim}, {swam}, {swum}"}. En el juego de escritura saldrá un campo por término.
+              </p>
             </div>
             <div>
-              <label className="text-sm font-medium">Example</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Example</label>
+                {wrapButton(exampleRef, "example")}
+              </div>
               <Textarea
+                ref={exampleRef}
                 value={form.example}
                 onChange={(e) => setForm({ ...form, example: e.target.value })}
                 placeholder="Example sentence"
