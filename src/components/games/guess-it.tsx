@@ -130,7 +130,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
             />
           )}
           <p className="text-sm text-muted-foreground mb-2">What is the translation of:</p>
-          <h2 className="text-3xl font-bold mb-4">
+          <h2 className="text-3xl font-bold mb-4 text-center">
             <TermText text={currentCard.front} />
           </h2>
           <Button

@@ -169,7 +169,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
               className="max-h-28 rounded-lg object-cover mb-3"
             />
           )}
-          <h2 className="text-4xl font-bold mb-2">
+          <h2 className="text-4xl font-bold mb-2 text-center">
             <TermText text={currentCard.front} />
           </h2>
           {currentCard.transcription && (
@@ -242,7 +242,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
               </button>
             ) : (
               <div className="flex flex-col items-center justify-center w-full h-full">
-                <h3 className="text-3xl font-bold text-primary">
+                <h3 className="text-3xl font-bold text-primary text-center">
                   <TermText text={currentCard.back} />
                 </h3>
                 {currentCard.example && (

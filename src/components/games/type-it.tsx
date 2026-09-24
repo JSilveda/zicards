@@ -264,7 +264,7 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-2 text-primary">
+              <h2 className="text-3xl font-bold mb-2 text-primary text-center">
                 <TermText text={correctAnswer || ""} />
               </h2>
               {currentCard.example && (
@@ -291,7 +291,7 @@ export function TypeIt({ cards, sourceLanguage, targetLanguage, onComplete, onPr
                   className="max-h-28 rounded-lg object-cover mb-3"
                 />
               )}
-              <h2 className="text-3xl font-bold mb-1">
+              <h2 className="text-3xl font-bold mb-1 text-center">
                 <TermText text={shownText || ""} />
               </h2>
               <Button

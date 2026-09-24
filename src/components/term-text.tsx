@@ -21,7 +21,7 @@ export function TermText({ text, className, chipClassName }: TermTextProps) {
           <span
             key={i}
             className={cn(
-              "mx-0.5 inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 align-baseline text-[0.9em] font-semibold text-primary",
+              "mx-0.5 my-0.5 inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 align-baseline text-[0.9em] font-semibold text-primary",
               chipClassName
             )}
           >
