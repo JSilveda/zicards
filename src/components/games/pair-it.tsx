@@ -180,7 +180,7 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
                 key={item.id}
                 onClick={() => handleLeftClick(item.id)}
                 disabled={isMatched}
-                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left flex items-center gap-2 ${
+                className={`w-full min-h-16 rounded-xl border-2 text-sm font-medium px-4 py-2 transition-all text-left flex items-center gap-2 break-words ${
                   isMatched
                     ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
                     : isWrong
@@ -218,7 +218,7 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
                 key={item.id}
                 onClick={() => handleRightClick(item.id)}
                 disabled={isMatched}
-                className={`w-full h-16 rounded-xl border-2 text-sm font-medium px-4 transition-all text-left ${
+                className={`w-full min-h-16 rounded-xl border-2 text-sm font-medium px-4 py-2 transition-all text-left flex items-center break-words ${
                   isMatched
                     ? "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700"
                     : isWrong
