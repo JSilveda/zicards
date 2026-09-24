@@ -10,7 +10,8 @@ export async function getDecks(): Promise<Deck[]> {
     .from("decks")
     .select("*")
     .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) throw error;
 
@@ -139,17 +140,73 @@ export async function getDeck(id: string): Promise<Deck | null> {
 }
 
 export async function createDeck(
-  deck: Omit<Deck, "id" | "created_at" | "updated_at" | "card_count" | "learned_count" | "due_count" | "progress_percent">
+  deck: Omit<Deck, "id" | "created_at" | "updated_at" | "card_count" | "learned_count" | "due_count" | "progress_percent" | "position">
 ): Promise<Deck> {
   const supabase = createClient();
+
+  const folderId = (deck as { folder_id?: string | null }).folder_id ?? null;
+  let positionQuery = supabase
+    .from("decks")
+    .select("position")
+    .eq("user_id", deck.user_id)
+    .order("position", { ascending: false })
+    .limit(1);
+  positionQuery = folderId
+    ? positionQuery.eq("folder_id", folderId)
+    : positionQuery.is("folder_id", null);
+  const { data: posRows } = await positionQuery;
+  const position =
+    posRows && posRows.length > 0 ? ((posRows[0] as { position: number }).position ?? 0) + 1 : 0;
+
   const { data, error } = await supabase
     .from("decks")
-    .insert(deck)
+    .insert({ ...deck, folder_id: folderId, position })
     .select()
     .single();
 
   if (error) throw error;
   return data;
+}
+
+export async function moveDeckToFolder(deckId: string, folderId: string | null): Promise<void> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  let positionQuery = supabase
+    .from("decks")
+    .select("position")
+    .eq("user_id", user.id)
+    .order("position", { ascending: false })
+    .limit(1);
+  positionQuery = folderId
+    ? positionQuery.eq("folder_id", folderId)
+    : positionQuery.is("folder_id", null);
+  const { data: posRows } = await positionQuery;
+  const position =
+    posRows && posRows.length > 0 ? ((posRows[0] as { position: number }).position ?? 0) + 1 : 0;
+
+  const { error } = await supabase
+    .from("decks")
+    .update({
+      folder_id: folderId,
+      position,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", deckId);
+  if (error) throw error;
+}
+
+export async function reorderDecks(orderedIds: string[]): Promise<void> {
+  const supabase = createClient();
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from("decks")
+        .update({ position: index, updated_at: new Date().toISOString() })
+        .eq("id", id)
+    )
+  );
 }
 
 export async function updateDeck(

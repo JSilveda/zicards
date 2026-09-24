@@ -12,12 +12,24 @@ export interface Deck {
   target_language: string;
   description: string | null;
   is_public: boolean;
+  folder_id: string | null;
+  position: number;
   created_at: string;
   updated_at: string;
   card_count?: number;
   learned_count?: number;
   due_count?: number;
   progress_percent?: number;
+}
+
+export interface Folder {
+  id: string;
+  user_id: string;
+  name: string;
+  parent_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Card {

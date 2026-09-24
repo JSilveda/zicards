@@ -17,15 +17,17 @@ import {
   MoreHorizontal,
   Gamepad2,
   RotateCcw,
+  FolderInput,
 } from "lucide-react";
 import type { Deck } from "@/types";
 
 interface DeckCardProps {
   deck: Deck;
   onDelete?: (id: string) => void;
+  onMove?: (id: string) => void;
 }
 
-export function DeckCard({ deck, onDelete }: DeckCardProps) {
+export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showGamesModal, setShowGamesModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -217,6 +219,19 @@ export function DeckCard({ deck, onDelete }: DeckCardProps) {
                         <RotateCcw className="h-4 w-4" />
                         Reset Progress
                       </button>
+                      {onMove && (
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                            onMove(deck.id);
+                          }}
+                        >
+                          <FolderInput className="h-4 w-4" />
+                          Mover
+                        </button>
+                      )}
                       {onDelete && (
                         <button
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left text-destructive"

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/navbar";
 
@@ -17,8 +17,10 @@ import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-export default function NewDeckPage() {
+function NewDeckForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const folderId = searchParams.get("folder");
   const [form, setForm] = useState({
     name: "",
     source_language: "en",
@@ -51,6 +53,7 @@ export default function NewDeckPage() {
         target_language: form.target_language,
         description: form.description || null,
         is_public: form.is_public,
+        folder_id: folderId,
       });
 
       router.push("/decks");
@@ -125,6 +128,12 @@ export default function NewDeckPage() {
                 </label>
               </div>
 
+              {folderId && (
+                <p className="text-sm text-muted-foreground">
+                  Se creará dentro de la carpeta seleccionada.
+                </p>
+              )}
+
               {error && <p className="text-sm text-destructive">{error}</p>}
 
               <Button type="submit" className="w-full gap-2" disabled={loading}>
@@ -136,5 +145,13 @@ export default function NewDeckPage() {
         </Card>
       </main>
     </AuthGuard>
+  );
+}
+
+export default function NewDeckPage() {
+  return (
+    <Suspense>
+      <NewDeckForm />
+    </Suspense>
   );
 }
