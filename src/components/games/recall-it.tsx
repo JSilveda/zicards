@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,18 +45,12 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
   const startTimeRef = useRef<number>(0);
   const currentCard = queue[currentIndex];
 
-  const currentCardRef = useRef(currentCard);
-  currentCardRef.current = currentCard;
-
-  const speakIfNeeded = useCallback(() => {
-    if (currentCardRef.current && !revealed) {
-      speak(currentCardRef.current.front, getLanguageVoiceCode(sourceLanguage));
-    }
-  }, [sourceLanguage, revealed]);
-
+  // Audio only for the revealed answer (bottom card), never for the top card
   useEffect(() => {
-    speakIfNeeded();
-  }, [currentIndex, speakIfNeeded]);
+    if (revealed && currentCard) {
+      speak(currentCard.back, getLanguageVoiceCode(targetLanguage));
+    }
+  }, [revealed, currentIndex, currentCard, targetLanguage]);
 
   useEffect(() => {
     const p = queue.length > 0 ? ((currentIndex + 1) / queue.length) * 100 : 0;
@@ -175,14 +169,6 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
           {currentCard.transcription && (
             <p className="text-muted-foreground mb-2">/{currentCard.transcription}/</p>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
-          >
-            <Volume2 className="h-4 w-4 mr-1" />
-            Listen
-          </Button>
         </CardContent>
       </Card>
 
@@ -252,6 +238,15 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
                     &quot;
                   </p>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-1"
+                  onClick={() => speak(currentCard.back, getLanguageVoiceCode(targetLanguage))}
+                >
+                  <Volume2 className="h-4 w-4 mr-1" />
+                  Listen
+                </Button>
               </div>
             )}
           </div>

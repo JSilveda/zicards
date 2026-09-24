@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, RotateCcw, Volume2 } from "lucide-react";
+import { Trophy, RotateCcw } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { TermText } from "@/components/term-text";
 import { toPlainText } from "@/lib/terms";
@@ -51,12 +51,6 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
     return [...wrongOptions, currentCard.back].sort(() => Math.random() - 0.5);
   }, [currentCard, shuffledCards]);
 
-  useEffect(() => {
-    if (currentCard) {
-      speak(currentCard.front, getLanguageVoiceCode(sourceLanguage));
-    }
-  }, [currentIndex, currentCard, sourceLanguage]);
-
   const progress = shuffledCards.length > 0
     ? ((currentIndex + 1) / shuffledCards.length) * 100
     : 0;
@@ -79,6 +73,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
     if (correct) {
       setScore((s) => s + 10 + streak * 2);
       setStreak((s) => s + 1);
+      speak(currentCard.back, getLanguageVoiceCode(targetLanguage));
     } else {
       setStreak(0);
     }
@@ -140,14 +135,6 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
           <h2 className="text-3xl font-bold mb-4 text-center">
             <TermText text={currentCard.front} />
           </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => speak(currentCard.front, getLanguageVoiceCode(sourceLanguage))}
-          >
-            <Volume2 className="h-4 w-4 mr-1" />
-            Listen
-          </Button>
         </CardContent>
       </Card>
 
