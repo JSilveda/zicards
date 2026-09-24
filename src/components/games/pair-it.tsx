@@ -97,6 +97,16 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
     onProgress?.(progress);
   }, [progress, onProgress]);
 
+  const [locked, setLocked] = useState(false);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    const pending = timeoutsRef.current;
+    return () => {
+      pending.forEach(clearTimeout);
+    };
+  }, []);
+
   const checkMatch = useCallback(
     (leftId: string, rightId: string) => {
       const leftItem = leftItems.find((l) => l.id === leftId);
@@ -105,22 +115,29 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
       if (!leftItem || !rightItem) return;
 
       if (leftItem.cardId === rightItem.cardId) {
+        // Show green immediately, but hold the block refresh so it can be seen
         setMatched((prev) => new Set([...prev, leftId, rightId]));
         setScore((s) => s + 10);
-        setTotalMatched((t) => t + 1);
-
-        const newUsedIndices = new Set(usedIndices);
-        const cardIndex = cards.findIndex((c) => c.id === leftItem.cardId);
-        newUsedIndices.add(cardIndex);
-        setUsedIndices(newUsedIndices);
-
         setSelectedLeft(null);
         setSelectedRight(null);
+        setLocked(true);
 
+        const cardIndex = cards.findIndex((c) => c.id === leftItem.cardId);
         const newTotalMatched = totalMatched + 1;
-        if (newTotalMatched >= totalPairs) {
-          setTimeout(() => setIsComplete(true), 500);
-        }
+        timeoutsRef.current.push(
+          setTimeout(() => {
+            setUsedIndices((prev) => {
+              const next = new Set(prev);
+              next.add(cardIndex);
+              return next;
+            });
+            setTotalMatched(newTotalMatched);
+            setLocked(false);
+            if (newTotalMatched >= totalPairs) {
+              timeoutsRef.current.push(setTimeout(() => setIsComplete(true), 500));
+            }
+          }, 900)
+        );
       } else {
         setWrongPair([leftId, rightId]);
         setTimeout(() => {
@@ -130,11 +147,11 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
         }, 800);
       }
     },
-    [leftItems, rightItems, usedIndices, cards, totalMatched, totalPairs]
+    [leftItems, rightItems, cards, totalMatched, totalPairs]
   );
 
   const handleLeftClick = (id: string) => {
-    if (matched.has(id) || wrongPair?.includes(id)) return;
+    if (locked || matched.has(id) || wrongPair?.includes(id)) return;
     setSelectedLeft(id);
     if (selectedRight) {
       checkMatch(id, selectedRight);
@@ -142,7 +159,7 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
   };
 
   const handleRightClick = (id: string) => {
-    if (matched.has(id) || wrongPair?.includes(id)) return;
+    if (locked || matched.has(id) || wrongPair?.includes(id)) return;
     setSelectedRight(id);
     if (selectedLeft) {
       checkMatch(selectedLeft, id);
