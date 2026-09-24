@@ -159,7 +159,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           const missing = learnCards.filter((c) => !existingIds.has(c.id));
           if (missing.length > 0) orderedCards.push(...missing);
         } else {
-          orderedCards = shuffleArray(learnCards);
+          orderedCards = [...shuffleArray(freshCards), ...shuffleArray(reviewedCards)];
         }
 
         const batches: CardType[][] = [];
