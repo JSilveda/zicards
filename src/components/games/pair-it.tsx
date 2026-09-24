@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, RotateCcw, CheckCircle } from "lucide-react";
 import { TermText } from "@/components/term-text";
+import { useEqualTileHeight } from "@/lib/use-equal-height";
 import type { Card as CardType } from "@/types";
 
 interface PairItProps {
@@ -85,6 +86,12 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
   }, [blockIndices, cards]);
 
   const progress = totalPairs > 0 ? (totalMatched / totalPairs) * 100 : 0;
+
+  // All tiles share the tallest tile's height
+  const { setRef: setTileRef, height: tileHeight } = useEqualTileHeight<HTMLButtonElement>(
+    blockIndices.join(",")
+  );
+  const tileStyle = tileHeight ? { minHeight: tileHeight } : undefined;
 
   useEffect(() => {
     onProgress?.(progress);
@@ -178,6 +185,8 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
             return (
               <button
                 key={item.id}
+                ref={setTileRef(item.id)}
+                style={tileStyle}
                 onClick={() => handleLeftClick(item.id)}
                 disabled={isMatched}
                 className={`w-full min-h-16 rounded-xl border-2 text-sm font-medium px-4 py-2 transition-all text-left flex items-center gap-2 break-words ${
@@ -216,6 +225,8 @@ export function PairIt({ cards, onComplete, onProgress, autoAdvance }: PairItPro
             return (
               <button
                 key={item.id}
+                ref={setTileRef(item.id)}
+                style={tileStyle}
                 onClick={() => handleRightClick(item.id)}
                 disabled={isMatched}
                 className={`w-full min-h-16 rounded-xl border-2 text-sm font-medium px-4 py-2 transition-all text-left flex items-center break-words ${

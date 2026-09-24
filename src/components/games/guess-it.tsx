@@ -8,6 +8,7 @@ import { Trophy, RotateCcw, Volume2 } from "lucide-react";
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { TermText } from "@/components/term-text";
 import { toPlainText } from "@/lib/terms";
+import { useEqualTileHeight } from "@/lib/use-equal-height";
 import type { Card as CardType } from "@/types";
 
 interface GuessItProps {
@@ -63,6 +64,12 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
   useEffect(() => {
     onProgress?.(progress);
   }, [progress, onProgress]);
+
+  // All option tiles share the tallest tile's height
+  const { setRef: setTileRef, height: tileHeight } = useEqualTileHeight<HTMLButtonElement>(
+    `${currentIndex}:${options.length}`
+  );
+  const tileStyle = tileHeight ? { minHeight: tileHeight } : undefined;
 
   const handleSelect = (option: string) => {
     if (selected) return;
@@ -158,6 +165,8 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
           return (
             <button
               key={`${currentIndex}-${option}`}
+              ref={setTileRef(`${currentIndex}-${option}`)}
+              style={tileStyle}
               onClick={() => handleSelect(option)}
               disabled={!!selected}
               className={`p-4 rounded-xl border-2 font-medium transition-all ${style}`}
