@@ -122,8 +122,8 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
         </div>
       </div>
 
-      <Card className="mb-6">
-        <CardContent className="flex flex-col items-center justify-center py-10">
+      <Card className="mb-4">
+        <CardContent className="flex flex-col items-center justify-center py-6">
           {currentCard.image_url && (
             <img
               src={currentCard.image_url}
