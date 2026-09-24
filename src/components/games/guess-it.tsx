@@ -138,7 +138,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         {options.map((option) => {
           let style = "bg-card hover:bg-muted border-border";
           if (selected) {
