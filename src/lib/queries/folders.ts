@@ -114,6 +114,23 @@ export async function moveFolder(
   if (error) throw error;
 }
 
+export async function placeFolder(
+  id: string,
+  parentId: string | null,
+  position: number
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("folders")
+    .update({
+      parent_id: parentId,
+      position,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function reorderFolders(orderedIds: string[]): Promise<void> {
   const supabase = createClient();
   await Promise.all(

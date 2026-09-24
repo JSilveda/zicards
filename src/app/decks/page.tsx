@@ -18,7 +18,7 @@ import {
   renameFolder,
   moveFolder,
   deleteFolder,
-  reorderFolders,
+  placeFolder,
   getDescendantIds,
 } from "@/lib/queries/folders";
 import {
@@ -28,8 +28,6 @@ import {
   FolderPlus,
   Home,
   ChevronRight,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import type { Deck, Folder } from "@/types";
 
@@ -44,6 +42,7 @@ interface DropTarget {
   type: "folder" | "deck" | "container" | "root";
   id?: string;
   before?: boolean;
+  folderPosition?: "before" | "inside" | "after";
 }
 
 function sortByPosition<T extends { position?: number | null; created_at: string }>(items: T[]): T[] {
@@ -181,7 +180,11 @@ export default function DecksPage() {
     clearDrag();
   };
 
-  const handleFolderDrop = async (e: React.DragEvent, folder: Folder) => {
+  const handleFolderDrop = async (
+    e: React.DragEvent,
+    folder: Folder,
+    position: "before" | "inside" | "after" = "inside"
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     if (!dragItem || isSearching) {
@@ -200,7 +203,32 @@ export default function DecksPage() {
           clearDrag();
           return;
         }
-        await moveFolder(folders, dragItem.id, folder.id);
+        if (position === "inside") {
+          await moveFolder(folders, dragItem.id, folder.id);
+        } else {
+          const newParentId = folder.parent_id;
+          const siblings = sortByPosition(
+            folders.filter(
+              (f) => (f.parent_id ?? null) === (newParentId ?? null) && f.id !== dragItem.id
+            )
+          );
+          let idx = siblings.findIndex((f) => f.id === folder.id);
+          if (idx === -1) {
+            clearDrag();
+            return;
+          }
+          if (position === "after") idx += 1;
+          const dragged = folders.find((f) => f.id === dragItem.id);
+          if (!dragged) {
+            clearDrag();
+            return;
+          }
+          const newOrder = [...siblings];
+          newOrder.splice(idx, 0, dragged);
+          await Promise.all(
+            newOrder.map((f, i) => placeFolder(f.id, newParentId, i))
+          );
+        }
         await loadAll();
       }
     } catch (error) {
@@ -283,21 +311,6 @@ export default function DecksPage() {
       await loadAll();
     } catch (error) {
       console.error("Failed to delete folder:", error);
-    }
-  };
-
-  const handleMoveFolderUpDown = async (folder: Folder, direction: -1 | 1) => {
-    const siblings = childFolders;
-    const idx = siblings.findIndex((f) => f.id === folder.id);
-    const swapIdx = idx + direction;
-    if (idx === -1 || swapIdx < 0 || swapIdx >= siblings.length) return;
-    const newOrder = [...siblings];
-    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
-    try {
-      await reorderFolders(newOrder.map((f) => f.id));
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to reorder folders:", error);
     }
   };
 
@@ -465,14 +478,25 @@ export default function DecksPage() {
             {foldersSupported && childFolders.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Carpetas</p>
-                {childFolders.map((f, idx) => (
-                  <div key={f.id} className="flex items-start gap-1">
-                    <div className="flex-1">
+                {childFolders.map((f) => {
+                  const isDropTarget = dropTarget?.type === "folder" && dropTarget.id === f.id;
+                  const folderPos = isDropTarget ? dropTarget.folderPosition ?? "inside" : null;
+                  return (
+                    <div
+                      key={f.id}
+                      className={`rounded-2xl transition-all ${
+                        isDropTarget && folderPos !== "inside"
+                          ? folderPos === "before"
+                            ? "outline outline-2 outline-primary outline-offset-2 -translate-y-0.5"
+                            : "outline outline-2 outline-primary outline-offset-2 translate-y-0.5"
+                          : ""
+                      }`}
+                    >
                       <FolderCard
                         name={f.name}
                         deckCount={decks.filter((d) => (d.folder_id ?? null) === f.id).length}
                         subfolderCount={folders.filter((x) => x.parent_id === f.id).length}
-                        dropHighlight={dropTarget?.type === "folder" && dropTarget.id === f.id}
+                        dropHighlight={isDropTarget && folderPos === "inside"}
                         draggable
                         onOpen={() => setCurrentFolderId(f.id)}
                         onNewDeck={() => router.push(`/decks/new?folder=${f.id}`)}
@@ -485,36 +509,26 @@ export default function DecksPage() {
                           if (dragItem && dragItem.id !== f.id) {
                             e.preventDefault();
                             e.stopPropagation();
-                            setDropTarget({ type: "folder", id: f.id });
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            const ratio = (e.clientY - rect.top) / rect.height;
+                            const folderPosition =
+                              ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "inside";
+                            setDropTarget({ type: "folder", id: f.id, folderPosition });
                           }
                         }}
                         onDragLeave={() => setDropTarget(null)}
-                        onDrop={(e) => handleFolderDrop(e, f)}
+                        onDrop={(e) => {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          const ratio = (e.clientY - rect.top) / rect.height;
+                          const folderPosition =
+                            ratio < 0.25 ? "before" : ratio > 0.75 ? "after" : "inside";
+                          handleFolderDrop(e, f, folderPosition);
+                        }}
                         onDragEnd={clearDrag}
                       />
                     </div>
-                    <div className="flex flex-col gap-1 pt-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        disabled={idx === 0}
-                        onClick={() => handleMoveFolderUpDown(f, -1)}
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        disabled={idx === childFolders.length - 1}
-                        onClick={() => handleMoveFolderUpDown(f, 1)}
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
