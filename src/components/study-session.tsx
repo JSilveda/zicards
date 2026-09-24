@@ -233,9 +233,16 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     if (mode === "learn" || mode === "review") {
       const saved = loadProgressData(deck.id, mode);
       if (saved) {
-        setPendingResume(saved);
-        setShowResumeDialog(true);
-        return;
+        const isAtStart =
+          saved.batchIndex === 0 &&
+          (saved.currentIndex ?? 0) === 0 &&
+          saved.phase === "flashcards";
+        if (!isAtStart) {
+          setPendingResume(saved);
+          setShowResumeDialog(true);
+          return;
+        }
+        clearProgressData(deck.id, mode);
       }
     }
     savedProgressHandledRef.current = true;
@@ -243,6 +250,8 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   useEffect(() => {
     if (!savedProgressHandledRef.current) return;
+    const isAtStart = batchIndex === 0 && currentIndex === 0 && phase === "flashcards";
+    if (isAtStart) return;
     if (cards.length > 0 && mode === "learn" && !showResumeDialog && !isReasking && !isComplete) {
       saveProgressData({
         deckId: deck.id,
