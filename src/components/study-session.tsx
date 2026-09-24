@@ -142,7 +142,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           reviewedCards = [];
         }
 
-        const learnCards = [...freshCards, ...reviewedCards];
+        const learnCards = freshCards.length > 0 ? [...freshCards] : [...reviewedCards];
         setAllCards(learnCards);
         setNewCardIds(new Set(freshCards.map((c) => c.id)));
 
@@ -159,7 +159,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           const missing = learnCards.filter((c) => !existingIds.has(c.id));
           if (missing.length > 0) orderedCards.push(...missing);
         } else {
-          orderedCards = [...shuffleArray(freshCards), ...shuffleArray(reviewedCards)];
+          orderedCards = shuffleArray(learnCards);
         }
 
         const batches: CardType[][] = [];
