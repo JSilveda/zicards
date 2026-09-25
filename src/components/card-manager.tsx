@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
+import { getReviewsForDeck } from "@/lib/queries/reviews";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Plus, Image, ArrowUpDown, Braces } from "lucide-react";
 import type { Card as CardType } from "@/types";
@@ -27,6 +28,7 @@ export function CardManager({
   searchQuery: externalSearch = "",
 }: CardManagerProps) {
   const [cards, setCards] = useState<CardType[]>([]);
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CardType | null>(null);
@@ -80,8 +82,12 @@ export function CardManager({
 
   const loadCards = useCallback(async () => {
     try {
-      const data = await getCards(deckId);
+      const [data, reviews] = await Promise.all([
+        getCards(deckId),
+        getReviewsForDeck(deckId).catch(() => []),
+      ]);
       setCards(data);
+      setReviewedIds(new Set(reviews.map((r) => r.card_id)));
     } catch (error) {
       console.error("Failed to load cards:", error);
     } finally {
@@ -240,6 +246,7 @@ export function CardManager({
               targetLanguage={targetLanguage}
               onEdit={openEdit}
               onDelete={handleDelete}
+              isNew={!reviewedIds.has(card.id)}
             />
           ))
         )}

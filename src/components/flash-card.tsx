@@ -17,6 +17,7 @@ interface FlashCardProps {
   onEdit?: (card: FlashCardType) => void;
   onDelete?: (id: string) => void;
   showActions?: boolean;
+  isNew?: boolean;
 }
 
 export function FlashCard({
@@ -26,6 +27,7 @@ export function FlashCard({
   onEdit,
   onDelete,
   showActions = true,
+  isNew = false,
 }: FlashCardProps) {
   const [flipped, setFlipped] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -63,6 +65,12 @@ export function FlashCard({
             style={{ backfaceVisibility: "hidden" }}
           >
             <CardContent className="text-center p-0 w-full">
+              {isNew && (
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  New
+                </span>
+              )}
               {showActions && (
                 <div className="absolute top-2 right-2" ref={menuRef}>
                   <button
