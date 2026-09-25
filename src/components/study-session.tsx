@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +13,7 @@ import type { ReviewGrade } from "@/lib/srs";
 import { submitReview, getDueCards, getReviewsForDeck, ensureReviewsExist } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
-import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play, X, Undo2 } from "lucide-react";
+import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play, Undo2 } from "lucide-react";
 import type { Card as CardType, Deck } from "@/types";
 
 const PairIt = dynamic(() => import("@/components/games/pair-it").then((m) => m.PairIt), { ssr: false });
@@ -81,7 +80,6 @@ function clearProgressData(deckId: string, mode: string) {
 }
 
 export function StudySession({ deck, mode = "review", onProgress }: StudySessionProps) {
-  const router = useRouter();
   const [cards, setCards] = useState<CardType[]>([]);
   const [allCards, setAllCards] = useState<CardType[]>([]);
   const [batchIndex, setBatchIndex] = useState(0);
@@ -737,17 +735,17 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           )}
         </div>
 
-        <div className="relative mb-2" style={{ touchAction: "pan-y" }}>
-          {/* Card stack behind */}
+        <div className="relative mb-2 pb-6" style={{ touchAction: "pan-y" }}>
+          {/* Card stack behind: two solid layers peeking below the top card */}
           <div
             aria-hidden
-            className="absolute inset-x-5 top-4 bottom-0 rounded-3xl bg-muted/50"
-            style={{ transform: "rotate(-2.5deg)" }}
+            className="absolute left-7 right-7 top-7 bottom-1 rounded-3xl border border-border bg-card shadow-lg"
+            style={{ transform: "rotate(-3deg)" }}
           />
           <div
             aria-hidden
-            className="absolute inset-x-2.5 top-2 bottom-0 rounded-3xl bg-muted/80"
-            style={{ transform: "rotate(1.5deg)" }}
+            className="absolute left-3.5 right-3.5 top-3.5 bottom-2.5 rounded-3xl border border-border bg-card shadow-md"
+            style={{ transform: "rotate(2deg)" }}
           />
 
           {/* Draggable top card */}
@@ -778,19 +776,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 style={{ backfaceVisibility: "hidden" }}
               >
                 <CardContent className="text-center p-0 w-full">
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-xs font-medium text-muted-foreground">Question</span>
-                    <button
-                      className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/decks/${deck.id}`);
-                      }}
-                      aria-label="Exit session"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
                   <div className="flex justify-center gap-2 mb-4 min-h-[18px]">
                     {isCurrentNew && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
@@ -844,19 +829,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
               >
                 <CardContent className="text-center p-0 w-full">
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-xs font-medium text-muted-foreground">Answer</span>
-                    <button
-                      className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/decks/${deck.id}`);
-                      }}
-                      aria-label="Exit session"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
                   {currentCard.image_url && (
                     <img
                       src={currentCard.image_url}
