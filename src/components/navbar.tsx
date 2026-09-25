@@ -16,7 +16,9 @@ import {
   X,
   Zap,
   NotebookPen,
+  Settings,
 } from "lucide-react";
+import { useBranding } from "@/lib/branding";
 import type { Session } from "@supabase/supabase-js";
 
 const navItems = [
@@ -31,6 +33,14 @@ function NavbarInner() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { logo } = useBranding();
+
+  const brandMark = logo ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={logo} alt="ZiCards" className="h-7 w-7 rounded-lg object-cover" />
+  ) : (
+    <Zap className="h-6 w-6 text-primary" />
+  );
 
   useEffect(() => {
     import("@/lib/supabase/client").then(({ createClient }) => {
@@ -59,7 +69,7 @@ function NavbarInner() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-            <Zap className="h-6 w-6 text-primary" />
+            {brandMark}
             <span>ZiCards</span>
           </Link>
           <div className="flex items-center gap-2">
@@ -80,7 +90,7 @@ function NavbarInner() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl">
-          <Zap className="h-6 w-6 text-primary" />
+          {brandMark}
           <span>ZiCards</span>
         </Link>
 
@@ -105,6 +115,11 @@ function NavbarInner() {
 
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
+          <Link href="/settings">
+            <Button variant="ghost" size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Link>
           <Link href="/profile">
             <Button variant="ghost" size="icon">
               <User className="h-5 w-5" />
@@ -148,6 +163,12 @@ function NavbarInner() {
               );
             })}
             <hr className="my-2" />
+            <Link href="/settings" onClick={() => setMobileOpen(false)}>
+              <Button variant="ghost" className="w-full justify-start gap-2">
+                <Settings className="h-4 w-4" />
+                Settings
+              </Button>
+            </Link>
             <Link href="/profile" onClick={() => setMobileOpen(false)}>
               <Button variant="ghost" className="w-full justify-start gap-2">
                 <User className="h-4 w-4" />
