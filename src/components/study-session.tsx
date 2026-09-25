@@ -977,26 +977,26 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               <button
                 onClick={() => gradeWithAnimation("missed", "left")}
                 disabled={submitting}
-                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
+                className="flex-1 max-w-[150px] flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-3 font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
               >
                 <XCircle className="h-5 w-5" />
-                Missed
+                <span className="text-sm leading-tight">Missed</span>
               </button>
               <button
                 onClick={() => gradeWithAnimation("effort", "up")}
                 disabled={submitting}
-                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+                className="flex-1 max-w-[150px] flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-3 font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
               >
                 <Undo2 className="h-5 w-5" />
-                With effort
+                <span className="text-sm leading-tight">With effort</span>
               </button>
               <button
                 onClick={() => gradeWithAnimation("easy", "right")}
                 disabled={submitting}
-                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-colors disabled:opacity-50"
+                className="flex-1 max-w-[150px] flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-3 font-semibold bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-colors disabled:opacity-50"
               >
                 <CheckCircle className="h-5 w-5" />
-                Easy
+                <span className="text-sm leading-tight">Easy</span>
               </button>
             </div>
           </div>
