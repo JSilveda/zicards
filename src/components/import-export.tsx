@@ -15,6 +15,7 @@ import {
   safeFilename,
   todayStamp,
   importCardsToDeck,
+  readUploadedText,
   type ImportRow,
   type ImportMode,
 } from "@/lib/import-export";
@@ -34,8 +35,9 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
   const [exporting, setExporting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [mode, setMode] = useState<ImportMode>("upsert");
+  const [encoding, setEncoding] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
@@ -43,29 +45,27 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
     setParsedCards([]);
     setErrors([]);
     setSuccess(null);
+    setEncoding(null);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      try {
-        if (/\.json$/i.test(selected.name)) {
-          const backup = parseBackupFile(text);
-          const cards = backup.decks.flatMap((d) => d.cards);
-          if (cards.length === 0) {
-            setErrors(["El JSON no contiene cartas"]);
-          } else {
-            setParsedCards(cards);
-          }
+    try {
+      const { text, encoding } = await readUploadedText(selected);
+      setEncoding(encoding);
+      if (/\.json$/i.test(selected.name)) {
+        const backup = parseBackupFile(text);
+        const cards = backup.decks.flatMap((d) => d.cards);
+        if (cards.length === 0) {
+          setErrors(["El JSON no contiene cartas"]);
         } else {
-          const { cards, errors } = parseCardsCSV(text);
-          setErrors(errors);
           setParsedCards(cards);
         }
-      } catch (err) {
-        setErrors([err instanceof Error ? err.message : "No se pudo leer el archivo"]);
+      } else {
+        const { cards, errors } = parseCardsCSV(text);
+        setErrors(errors);
+        setParsedCards(cards);
       }
-    };
-    reader.readAsText(selected);
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : "No se pudo leer el archivo"]);
+    }
   };
 
   const [showReplaceModal, setShowReplaceModal] = useState(false);
@@ -121,7 +121,8 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
             })),
             true
           ),
-          "text/csv"
+          "text/csv",
+          true
         );
       } else {
         const { buildBackupFile } = await import("@/lib/import-export");
@@ -192,7 +193,12 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
           </div>
 
           <Input type="file" accept=".csv,.tsv,.txt,.json" onChange={handleFileChange} />
-          {fileName && <p className="text-xs text-muted-foreground">Archivo: {fileName}</p>}
+          {fileName && (
+            <p className="text-xs text-muted-foreground">
+              Archivo: {fileName}
+              {encoding && ` · Detectado: ${encoding}`}
+            </p>
+          )}
 
           {errors.length > 0 && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">

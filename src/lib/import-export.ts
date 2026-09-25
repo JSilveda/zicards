@@ -349,8 +349,27 @@ export function parseBackupFile(jsonText: string): BackupFile {
 
 // ------------------------------------------------------------------ Download
 
-export function downloadFile(filename: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: `${mime};charset=utf-8;` });
+/**
+ * Read an uploaded text file with encoding detection. Files saved on Windows
+ * (e.g. Excel in Spanish locale) are often Windows-1252, not UTF-8 — reading
+ * those as UTF-8 turns ñ/accents into �. Strict UTF-8 is tried first and
+ * Windows-1252 is used as fallback. A leading BOM is stripped.
+ */
+export async function readUploadedText(file: File): Promise<{ text: string; encoding: string }> {
+  const buf = await file.arrayBuffer();
+  try {
+    const strict = new TextDecoder("utf-8", { fatal: true });
+    return { text: strict.decode(buf).replace(/^\uFEFF/, ""), encoding: "UTF-8" };
+  } catch {
+    const latin1 = new TextDecoder("windows-1252");
+    return { text: latin1.decode(buf).replace(/^\uFEFF/, ""), encoding: "Windows-1252 (Latin-1)" };
+  }
+}
+
+export function downloadFile(filename: string, content: string, mime: string, addBom = false) {
+  // BOM helps Excel on Windows open UTF-8 CSVs with correct accents.
+  // Never add it to JSON (strict parsers reject a leading BOM).
+  const blob = new Blob([addBom ? "\uFEFF" + content : content], { type: `${mime};charset=utf-8;` });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = filename;

@@ -33,6 +33,7 @@ import {
   type ImportRow,
   type ImportMode,
   importCardsToDeck,
+  readUploadedText,
 } from "@/lib/import-export";
 import {
   ArrowLeft,
@@ -201,7 +202,8 @@ function ImportExportPage() {
               })),
               true
             ),
-            "text/csv"
+            "text/csv",
+            true
           );
         } else {
           const backupFile = buildBackupFile(folders, [
@@ -241,7 +243,9 @@ function ImportExportPage() {
   };
 
   // ------------------------------------------------------------- Import
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [encoding, setEncoding] = useState<string | null>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
     setFileName(selected.name);
@@ -249,32 +253,30 @@ function ImportExportPage() {
     setBackup(null);
     setParseErrors([]);
     setImportResult(null);
+    setEncoding(null);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      try {
-        if (/\.json$/i.test(selected.name)) {
-          const parsed = parseBackupFile(text);
-          const totalCards = parsed.decks.reduce((n, d) => n + d.cards.length, 0);
-          if (parsed.decks.length === 0) {
-            setParseErrors(["El JSON no contiene decks"]);
-          } else {
-            setBackup(parsed);
-            if (totalCards === 0) {
-              setParseErrors(["Aviso: los decks del JSON no traen cartas"]);
-            }
-          }
+    try {
+      const { text, encoding } = await readUploadedText(selected);
+      setEncoding(encoding);
+      if (/\.json$/i.test(selected.name)) {
+        const parsed = parseBackupFile(text);
+        const totalCards = parsed.decks.reduce((n, d) => n + d.cards.length, 0);
+        if (parsed.decks.length === 0) {
+          setParseErrors(["El JSON no contiene decks"]);
         } else {
-          const { cards, errors } = parseCardsCSV(text);
-          setParseErrors(errors);
-          setCsvCards(cards);
+          setBackup(parsed);
+          if (totalCards === 0) {
+            setParseErrors(["Aviso: los decks del JSON no traen cartas"]);
+          }
         }
-      } catch (err) {
-        setParseErrors([err instanceof Error ? err.message : "No se pudo leer el archivo"]);
+      } else {
+        const { cards, errors } = parseCardsCSV(text);
+        setParseErrors(errors);
+        setCsvCards(cards);
       }
-    };
-    reader.readAsText(selected);
+    } catch (err) {
+      setParseErrors([err instanceof Error ? err.message : "No se pudo leer el archivo"]);
+    }
   };
 
   const createCardsChunked = async (deckId: string, cards: BackupCard[]) => {
@@ -607,7 +609,12 @@ function ImportExportPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Input type="file" accept=".csv,.tsv,.txt,.json" onChange={handleFileChange} />
-                  {fileName && <p className="text-xs text-muted-foreground">Archivo: {fileName}</p>}
+                  {fileName && (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo: {fileName}
+                      {encoding && ` · Detectado: ${encoding}`}
+                    </p>
+                  )}
 
                   {parseErrors.length > 0 && (
                     <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
@@ -802,6 +809,11 @@ function ImportExportPage() {
                       <li>Si un texto lleva comas o saltos de línea, enciérralo entre comillas.</li>
                       <li>Se acepta coma (,) o punto y coma (;) como separador (Excel en español usa ;).</li>
                       <li>
+                        Tildes y ñ: se detecta automáticamente si el archivo viene en UTF-8 o en
+                        formato Windows/Excel (Latin-1). Verás el formato detectado junto al nombre
+                        del archivo.
+                      </li>
+                      <li>
                         Modos al importar a un deck existente: actualizar existentes y agregar nuevas,
                         solo agregar nuevas, o reemplazar todo el deck.
                       </li>
@@ -813,7 +825,7 @@ function ImportExportPage() {
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => downloadFile("plantilla.csv", CSV_TEMPLATE, "text/csv")}
+                      onClick={() => downloadFile("plantilla.csv", CSV_TEMPLATE, "text/csv", true)}
                     >
                       <FileDown className="h-4 w-4" />
                       Descargar plantilla CSV
