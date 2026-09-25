@@ -516,6 +516,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     setDrag({ dx: 0, dy: 0, active: false });
   };
 
+  // A click event lost after a swipe (retargeted to an unmounted node on
+  // mobile) must not eat the next card's first tap.
+  useEffect(() => {
+    suppressClickRef.current = false;
+    dragStartRef.current = null;
+  }, [currentIndex, cards]);
+
   const onCardPointerUp = (e: React.PointerEvent) => {
     if (!drag.active || !dragStartRef.current) return;
     const dx = e.clientX - dragStartRef.current.x;
