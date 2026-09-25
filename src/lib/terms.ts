@@ -83,3 +83,19 @@ export function toPlainText(text: string): string {
     .map((s) => s.value)
     .join("");
 }
+
+/**
+ * Spoken text: like plain text, but each term is wrapped in commas so TTS
+ * engines pause between terms. "{swim} {swam}" -> "swim, swam".
+ */
+export function toSpokenText(text: string): string {
+  const joined = parseSegments(text)
+    .map((s) => (s.type === "term" ? `, ${s.value}, ` : s.value))
+    .join("");
+  return joined
+    .replace(/[ \t ]+/g, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/(,\s*){2,}/g, ", ")
+    .replace(/^,\s*|,\s*$/g, "")
+    .trim();
+}

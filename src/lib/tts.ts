@@ -1,4 +1,4 @@
-import { toPlainText } from "./terms";
+import { toSpokenText } from "./terms";
 
 let voicesLoaded = false;
 
@@ -52,8 +52,8 @@ export async function speak(text: string, lang: string = "en-US") {
       return;
     }
 
-    // Never speak chip delimiters: "{swim}, {swam}" -> "swim, swam"
-    text = toPlainText(text);
+    // Never speak chip delimiters, pause between terms: "{swim} {swam}" -> "swim, swam"
+    text = toSpokenText(text);
 
     window.speechSynthesis.cancel();
 
@@ -80,8 +80,8 @@ export async function speakWithVoice(text: string, voiceUri: string) {
       return;
     }
 
-    // Never speak chip delimiters: "{swim}, {swam}" -> "swim, swam"
-    text = toPlainText(text);
+    // Never speak chip delimiters, pause between terms: "{swim} {swam}" -> "swim, swam"
+    text = toSpokenText(text);
 
     window.speechSynthesis.cancel();
 
