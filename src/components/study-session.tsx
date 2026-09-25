@@ -148,6 +148,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   }, [exit]);
 
   const batchesRef = useRef<CardType[][]>([]);
+  const batchCardsRef = useRef<CardType[]>([]);
   const advanceRef = useRef<() => void>(() => {});
   const answersRef = useRef<Map<string, ReviewGrade>>(new Map());
   const shuffledOrderRef = useRef<string[]>([]);
@@ -226,12 +227,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           setBatchIndex(resume.batchIndex);
           setPhase(resume.phase as "flashcards" | "games");
           setGameIndex(0);
+          batchCardsRef.current = batches[resume.batchIndex] || batches[0] || [];
           setCards(resBatchCards.length > 0 ? resBatchCards : batches[0] || []);
           setCurrentIndex(resume.currentIndex ?? 0);
         } else {
           setBatchIndex(0);
           setPhase("flashcards");
           setGameIndex(0);
+          batchCardsRef.current = batches[0] || [];
           setCards(batches[0] || []);
           setCurrentIndex(0);
         }
@@ -358,6 +361,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     const nextBatchIdx = batchIndex + 1;
     if (nextBatchIdx < batches.length) {
       setBatchIndex(nextBatchIdx);
+      batchCardsRef.current = batches[nextBatchIdx];
       setCards(batches[nextBatchIdx]);
       setCurrentIndex(0);
       setFlipped(false);
@@ -380,6 +384,11 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   };
 
   const advanceToGames = () => {
+    // Games always play with the FULL batch, not the re-asked subset,
+    // so Easy cards from the first pass are included too.
+    if (batchCardsRef.current.length > 0) {
+      setCards(batchCardsRef.current);
+    }
     setPhase("games");
     setGameIndex(0);
     setCurrentIndex(0);
