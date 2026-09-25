@@ -215,7 +215,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
 
           {/* Card content */}
           <div
-            className="absolute rounded-2xl bg-card flex items-center justify-center"
+            className="absolute rounded-2xl bg-card flex items-center justify-center overflow-y-auto"
             style={{ top: 3, left: 3, right: 3, bottom: 3 }}
           >
             {!revealed ? (
@@ -254,28 +254,31 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
         </div>
       </div>
 
-      {/* Action buttons */}
-      {revealed && (
-        <div className="flex justify-center gap-4">
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 text-red-600 min-w-[140px]"
-            onClick={() => handleRecall(false)}
-          >
-            <XIcon className="h-5 w-5" />
-            Forgot
-          </Button>
-          <Button
-            size="lg"
-            className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
-            onClick={() => handleRecall(true)}
-          >
-            <CheckIcon className="h-5 w-5" />
-            Remembered
-          </Button>
-        </div>
-      )}
+      {/* Action buttons - always rendered (invisible until reveal) so cards keep their size */}
+      <div
+        className={`flex justify-center gap-4 ${revealed ? "" : "invisible"}`}
+        aria-hidden={!revealed}
+      >
+        <Button
+          size="lg"
+          variant="outline"
+          className="gap-2 text-red-600 min-w-[140px]"
+          onClick={() => handleRecall(false)}
+          disabled={!revealed}
+        >
+          <XIcon className="h-5 w-5" />
+          Forgot
+        </Button>
+        <Button
+          size="lg"
+          className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
+          onClick={() => handleRecall(true)}
+          disabled={!revealed}
+        >
+          <CheckIcon className="h-5 w-5" />
+          Remembered
+        </Button>
+      </div>
     </div>
   );
 }
