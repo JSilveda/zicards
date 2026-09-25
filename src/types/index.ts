@@ -32,6 +32,19 @@ export interface Folder {
   updated_at: string;
 }
 
+export interface NotePage {
+  id: string;
+  user_id: string;
+  title: string;
+  /** BlockNote document (array of blocks). */
+  content: unknown;
+  icon: string | null;
+  parent_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Card {
   id: string;
   deck_id: string;

@@ -15,12 +15,14 @@ import {
   Menu,
   X,
   Zap,
+  NotebookPen,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/decks", label: "My Decks", icon: BookOpen },
+  { href: "/notes", label: "Notes", icon: NotebookPen },
   { href: "/import", label: "Import", icon: Upload },
 ];
 
