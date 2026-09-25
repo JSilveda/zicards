@@ -222,9 +222,9 @@ export function CardManager({
           />
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2">
         {sortedCards.length === 0 ? (
-          <Card className="py-12 text-center md:col-span-2 lg:col-span-3">
+          <Card className="py-12 text-center md:col-span-2">
             <CardContent>
               <p className="text-muted-foreground mb-4">
                 {externalSearch ? "No cards match your search" : "No cards yet. Add your first card!"}
