@@ -144,8 +144,8 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
   const timeLeft = Math.ceil(TIMER_SECONDS * (1 - progress));
 
   return (
-    <div className="max-w-lg mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-lg mx-auto p-4 flex min-h-[calc(100dvh-230px)] flex-col">
+      <div className="flex justify-between items-center mb-4">
         <Badge variant="outline">
           {currentIndex + 1}/{queue.length}
         </Badge>
@@ -153,8 +153,8 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
       </div>
 
       {/* Front card */}
-      <Card className="mb-4">
-        <CardContent className="flex flex-col items-center justify-center py-8">
+      <Card className="mb-4 flex min-h-[170px] flex-1 flex-col">
+        <CardContent className="flex flex-1 flex-col items-center justify-center py-6">
           <p className="text-sm text-muted-foreground mb-2">Memorize this word:</p>
           {currentCard.image_url && (
             <img
@@ -173,12 +173,13 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
       </Card>
 
       {/* Back card with border progress - same width as front card */}
-      <div className="flex justify-center mb-6">
-        <div className="relative" style={{ width: cardW, height: cardH }}>
+      <div className="flex justify-center mb-4">
+        <div className="relative w-full max-w-[340px]" style={{ height: cardH }}>
           {/* SVG border progress */}
           <svg
             className="absolute inset-0 w-full h-full"
             viewBox={`0 0 ${cardW} ${cardH}`}
+            preserveAspectRatio="none"
           >
             {/* Background border - visible track */}
             <rect
