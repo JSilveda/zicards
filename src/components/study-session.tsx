@@ -109,6 +109,43 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false });
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressClickRef = useRef(false);
+  const [exit, setExit] = useState<{
+    card: CardType;
+    dir: "left" | "right" | "up";
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const exitElRef = useRef<HTMLDivElement>(null);
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
+    };
+  }, []);
+
+  // Animate the exiting (graded) card off-screen
+  useEffect(() => {
+    if (!exit) return;
+    const el = exitElRef.current;
+    if (!el) return;
+    el.style.transition = "none";
+    el.style.transform = `translate(${exit.startX}px, ${exit.startY}px) rotate(${exit.startX / 16}deg)`;
+    el.style.opacity = "1";
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.28s ease-in, opacity 0.28s ease-in";
+        el.style.transform =
+          exit.dir === "left"
+            ? "translateX(-130%) rotate(-18deg)"
+            : exit.dir === "right"
+            ? "translateX(130%) rotate(18deg)"
+            : "translateY(-135%)";
+        el.style.opacity = "0";
+      })
+    );
+    return () => cancelAnimationFrame(raf);
+  }, [exit]);
 
   const batchesRef = useRef<CardType[][]>([]);
   const advanceRef = useRef<() => void>(() => {});
@@ -342,20 +379,35 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     }
   };
 
-  const handleGrade = async (grade: ReviewGrade) => {
-    if (submitting) return;
+  const advanceToGames = () => {
+    setPhase("games");
+    setGameIndex(0);
+    setCurrentIndex(0);
+    setFlipped(false);
+    setIsReasking(false);
+    setIncorrectCardIds([]);
+    setEffortCardIds([]);
+  };
+
+  /**
+   * Grade with a fly-out animation. The review is fired without awaiting
+   * (retry + end-of-session sync cover failures) and the next card advances
+   * synchronously beneath the exiting card — no snap-back.
+   */
+  const gradeWithAnimation = (
+    grade: ReviewGrade,
+    dir: "left" | "right" | "up",
+    start?: { x: number; y: number }
+  ) => {
+    if (submitting || exit) return;
+    const card = cards[currentIndex];
+    if (!card) return;
     setSubmitting(true);
 
-    const currentCard = cards[currentIndex];
-    if (!currentCard) { setSubmitting(false); return; }
-
-    try {
-      await submitReview(currentCard.id, grade);
-    } catch (error) {
+    submitReview(card.id, grade).catch((error) => {
       console.error("Failed to submit review:", error);
-    }
-
-    answersRef.current.set(currentCard.id, grade);
+    });
+    answersRef.current.set(card.id, grade);
 
     if (grade === "easy") {
       setCorrectCount((c) => c + 1);
@@ -366,7 +418,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     }
 
     const addUnique = (list: string[]) =>
-      list.includes(currentCard.id) ? list : [...list, currentCard.id];
+      list.includes(card.id) ? list : [...list, card.id];
 
     let newIncorrectIds = incorrectCardIds;
     let newEffortIds = effortCardIds;
@@ -376,27 +428,31 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     } else if (grade === "effort") {
       newEffortIds = addUnique(effortCardIds);
       setEffortCardIds(newEffortIds);
-      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+      newIncorrectIds = incorrectCardIds.filter((id) => id !== card.id);
       setIncorrectCardIds(newIncorrectIds);
     } else {
-      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
-      newEffortIds = effortCardIds.filter((id) => id !== currentCard.id);
+      newIncorrectIds = incorrectCardIds.filter((id) => id !== card.id);
+      newEffortIds = effortCardIds.filter((id) => id !== card.id);
       setIncorrectCardIds(newIncorrectIds);
       setEffortCardIds(newEffortIds);
     }
     setAnsweredCardIds((prev) => {
       const next = new Set(prev);
-      next.add(currentCard.id);
+      next.add(card.id);
       return next;
     });
     setNewCardIds((prev) => {
-      if (prev.has(currentCard.id)) {
+      if (prev.has(card.id)) {
         const next = new Set(prev);
-        next.delete(currentCard.id);
+        next.delete(card.id);
         return next;
       }
       return prev;
     });
+
+    setExit({ card, dir, startX: start?.x ?? 0, startY: start?.y ?? 0 });
+    setDrag({ dx: 0, dy: 0, active: false });
+    dragStartRef.current = null;
 
     if (currentIndex + 1 >= cards.length) {
       if (mode === "learn") {
@@ -413,17 +469,12 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             setFlipped(false);
             setIncorrectCardIds([]);
             setEffortCardIds([]);
-            setSubmitting(false);
-            return;
+          } else {
+            advanceToGames();
           }
+        } else {
+          advanceToGames();
         }
-        setPhase("games");
-        setGameIndex(0);
-        setCurrentIndex(0);
-        setFlipped(false);
-        setIsReasking(false);
-        setIncorrectCardIds([]);
-        setEffortCardIds([]);
       } else {
         clearProgressData(deck.id, mode);
         setIsComplete(true);
@@ -433,7 +484,11 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       setFlipped(false);
     }
 
-    setSubmitting(false);
+    if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
+    exitTimeoutRef.current = setTimeout(() => {
+      setExit(null);
+      setSubmitting(false);
+    }, 320);
   };
 
   const SWIPE_X = 110;
@@ -465,26 +520,17 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     if (!drag.active || !dragStartRef.current) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
-    dragStartRef.current = null;
     suppressClickRef.current = Math.abs(dx) > 10 || Math.abs(dy) > 10;
 
     if (Math.abs(dx) >= SWIPE_X && Math.abs(dx) >= Math.abs(dy)) {
-      const grade: ReviewGrade = dx > 0 ? "easy" : "missed";
-      setDrag({ dx: dx > 0 ? 600 : -600, dy, active: false });
-      setTimeout(() => {
-        setDrag({ dx: 0, dy: 0, active: false });
-        handleGrade(grade);
-      }, 180);
+      gradeWithAnimation(dx > 0 ? "easy" : "missed", dx > 0 ? "right" : "left", { x: dx, y: dy });
       return;
     }
     if (dy <= -SWIPE_UP && Math.abs(dy) > Math.abs(dx)) {
-      setDrag({ dx: 0, dy: -600, active: false });
-      setTimeout(() => {
-        setDrag({ dx: 0, dy: 0, active: false });
-        handleGrade("effort");
-      }, 180);
+      gradeWithAnimation("effort", "up", { x: dx, y: dy });
       return;
     }
+    dragStartRef.current = null;
     setDrag({ dx: 0, dy: 0, active: false });
   };
 
@@ -704,6 +750,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const currentCard = cards[currentIndex];
   if (!currentCard) return null;
+  const upcomingCard = cards[currentIndex + 1];
   const isCurrentNew = newCardIds.has(currentCard.id) && !answeredCardIds.has(currentCard.id);
   const isCurrentReask = isReasking;
 
@@ -748,6 +795,24 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             style={{ transform: "rotate(2deg)" }}
           />
 
+          {/* Upcoming card, blurred beneath the top one */}
+          {upcomingCard && (
+            <div
+              aria-hidden
+              className={`absolute inset-0 pointer-events-none transition-all duration-300 ${
+                exit ? "scale-100 opacity-100" : "scale-[0.96] opacity-80"
+              }`}
+            >
+              <Card className="w-full h-full flex flex-col items-center justify-center p-8 blur-[2px]">
+                <CardContent className="text-center p-0 w-full">
+                  <h2 className="text-3xl font-bold text-center text-muted-foreground">
+                    <TermText text={upcomingCard.front} />
+                  </h2>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* Draggable top card */}
           <div
             key={currentCard.id}
@@ -775,7 +840,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 className="w-full min-h-[340px] flex flex-col items-center justify-center p-8"
                 style={{ backfaceVisibility: "hidden" }}
               >
-                <CardContent className="text-center p-0 w-full">
+                <CardContent
+                  className="text-center p-0 w-full"
+                  style={{ opacity: 1 - Math.min(swipeIntensity * 1.4, 1) }}
+                >
                   <div className="flex justify-center gap-2 mb-4 min-h-[18px]">
                     {isCurrentNew && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
@@ -828,7 +896,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 className="w-full min-h-[340px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
                 style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
               >
-                <CardContent className="text-center p-0 w-full">
+                <CardContent
+                  className="text-center p-0 w-full"
+                  style={{ opacity: 1 - Math.min(swipeIntensity * 1.4, 1) }}
+                >
                   {currentCard.image_url && (
                     <img
                       src={currentCard.image_url}
@@ -863,29 +934,49 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               </Card>
             </div>
 
-            {/* Swipe tint + stamp */}
+            {/* Swipe tint + stamp (content fades out so only these show) */}
             {swipeDir && (
-              <div
-                className={`absolute inset-0 rounded-2xl pointer-events-none flex items-center justify-center ${
-                  swipeDir === "easy"
-                    ? "bg-emerald-500/15"
-                    : swipeDir === "missed"
-                    ? "bg-rose-500/15"
-                    : "bg-amber-500/15"
-                }`}
-                style={{ opacity: swipeIntensity }}
-              >
-                <span
-                  className={`text-3xl font-black tracking-widest ${
+              <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden">
+                <div
+                  className={`absolute inset-0 ${
                     swipeDir === "easy"
-                      ? "text-emerald-500"
+                      ? "bg-emerald-500"
                       : swipeDir === "missed"
-                      ? "text-rose-500"
-                      : "text-amber-500"
+                      ? "bg-rose-500"
+                      : "bg-amber-500"
                   }`}
-                >
-                  {swipeDir === "easy" ? "EASY" : swipeDir === "missed" ? "MISSED" : "EFFORT"}
-                </span>
+                  style={{ opacity: 0.25 + swipeIntensity * 0.75 }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span
+                    className="text-3xl font-black tracking-widest text-white drop-shadow-lg"
+                    style={{ opacity: swipeIntensity }}
+                  >
+                    {swipeDir === "easy" ? "EASY" : swipeDir === "missed" ? "MISSED" : "EFFORT"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Exiting (graded) card flying off, next card emerging beneath */}
+            {exit && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div ref={exitElRef} className="w-full h-full">
+                  <Card className="w-full h-full min-h-[340px] flex flex-col items-center justify-center p-8">
+                    <CardContent className="text-center p-0 w-full">
+                      <h2 className="text-3xl font-bold text-center">
+                        <TermText text={exit.card.back} />
+                      </h2>
+                      {exit.card.example && (
+                        <p className="text-muted-foreground italic mt-3 max-w-sm mx-auto">
+                          &quot;
+                          <TermText text={exit.card.example} />
+                          &quot;
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
           </div>
@@ -903,7 +994,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             </p>
             <div className="flex justify-center gap-3">
               <button
-                onClick={() => handleGrade("missed")}
+                onClick={() => gradeWithAnimation("missed", "left")}
                 disabled={submitting}
                 className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
               >
@@ -911,7 +1002,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 Missed
               </button>
               <button
-                onClick={() => handleGrade("effort")}
+                onClick={() => gradeWithAnimation("effort", "up")}
                 disabled={submitting}
                 className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
               >
@@ -919,7 +1010,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
                 With effort
               </button>
               <button
-                onClick={() => handleGrade("easy")}
+                onClick={() => gradeWithAnimation("easy", "right")}
                 disabled={submitting}
                 className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-colors disabled:opacity-50"
               >
