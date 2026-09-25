@@ -818,7 +818,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               }}
             >
               <Card
-                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8"
+                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8 border-border"
                 style={{ backfaceVisibility: "hidden" }}
               >
                 <CardContent
@@ -874,7 +874,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
               </Card>
 
               <Card
-                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
+                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8 absolute top-0 left-0 border-border"
                 style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
               >
                 <CardContent
@@ -943,7 +943,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             {exit && (
               <div className="absolute inset-0 pointer-events-none">
                 <div ref={exitElRef} className="w-full h-full">
-                  <Card className="w-full h-full min-h-[340px] flex flex-col items-center justify-center p-8">
+                  <Card className="w-full h-full min-h-[340px] flex flex-col items-center justify-center p-8 border-border">
                     <CardContent className="text-center p-0 w-full">
                       <h2 className="text-3xl font-bold text-center">
                         <TermText text={exit.card.back} />
