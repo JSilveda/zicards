@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCards } from "@/lib/queries/cards";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   parseCardsCSV,
   parseBackupFile,
@@ -67,11 +68,19 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
     reader.readAsText(selected);
   };
 
-  const handleImport = async () => {
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+
+  const handleImport = () => {
     if (parsedCards.length === 0) return;
-    if (mode === "replace" && !confirm("Se eliminarán todas las cartas actuales del deck antes de importar. ¿Continuar?")) {
+    if (mode === "replace") {
+      setShowReplaceModal(true);
       return;
     }
+    doImport();
+  };
+
+  const doImport = async () => {
+    if (parsedCards.length === 0) return;
 
     setImporting(true);
     try {
@@ -151,6 +160,14 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={showReplaceModal}
+        onOpenChange={setShowReplaceModal}
+        title="Reemplazar deck"
+        description="Se eliminarán todas las cartas actuales del deck antes de importar. Esta acción no se puede deshacer."
+        confirmLabel="Reemplazar"
+        onConfirm={doImport}
+      />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

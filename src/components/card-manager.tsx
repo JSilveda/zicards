@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FlashCard } from "@/components/flash-card";
 import { getCards, createCard, updateCard, deleteCard } from "@/lib/queries/cards";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Plus, Image, ArrowUpDown, Braces } from "lucide-react";
 import type { Card as CardType } from "@/types";
 
@@ -148,13 +149,21 @@ export function CardManager({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this card?")) return;
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
     try {
-      await deleteCard(id);
+      await deleteCard(pendingDeleteId);
       loadCards();
     } catch (error) {
       console.error("Failed to delete card:", error);
+    } finally {
+      setPendingDeleteId(null);
     }
   };
 
@@ -235,6 +244,16 @@ export function CardManager({
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+        title="Eliminar carta"
+        description="La carta se eliminará del deck. Esta acción no se puede deshacer."
+        onConfirm={confirmDelete}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">

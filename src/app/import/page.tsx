@@ -9,6 +9,7 @@ const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.Au
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDecks } from "@/lib/queries/decks";
 import { getFolders, createFolder } from "@/lib/queries/folders";
@@ -328,7 +329,17 @@ function ImportExportPage() {
     return parentId;
   };
 
-  const handleImport = async () => {
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+
+  const handleImport = () => {
+    if (csvCards && csvTarget === "existing" && csvMode === "replace") {
+      setShowReplaceModal(true);
+      return;
+    }
+    doImport();
+  };
+
+  const doImport = async () => {
     setImporting(true);
     setImportResult(null);
     try {
@@ -337,9 +348,6 @@ function ImportExportPage() {
         if (csvCards.length === 0) throw new Error("No hay cartas para importar");
         if (csvTarget === "existing") {
           if (!csvDeckId) throw new Error("Selecciona un deck de destino");
-          if (csvMode === "replace" && !confirm("Se eliminarán todas las cartas actuales del deck antes de importar. ¿Continuar?")) {
-            return;
-          }
           const result = await importCardsToDeck(csvDeckId, csvCards, csvMode);
           const deck = decks.find((d) => d.id === csvDeckId);
           const parts: string[] = [];
@@ -470,6 +478,15 @@ function ImportExportPage() {
         <p className="text-muted-foreground mb-6">
           Lleva tus decks y carpetas en CSV o JSON, con previsualización antes de importar.
         </p>
+
+        <ConfirmDialog
+          open={showReplaceModal}
+          onOpenChange={setShowReplaceModal}
+          title="Reemplazar deck"
+          description="Se eliminarán todas las cartas actuales del deck antes de importar. Esta acción no se puede deshacer."
+          confirmLabel="Reemplazar"
+          onConfirm={doImport}
+        />
 
         <div className="flex gap-2 mb-6">
           <button className={tabBtn("import", "Importar")} onClick={() => setTab("import")}>

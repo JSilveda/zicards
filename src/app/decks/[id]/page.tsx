@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { getDeck, updateDeck, deleteDeck } from "@/lib/queries/decks";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { LANGUAGES, getLanguageName } from "@/lib/utils";
 import { GamesModal } from "@/components/games/games-modal";
 import {
@@ -113,9 +114,14 @@ export default function DeckDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const handleDelete = () => {
     setShowMenu(false);
-    if (!confirm("Delete this deck and all its cards? This cannot be undone.")) return;
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
     try {
       await deleteDeck(deckId);
       router.push("/decks");
@@ -493,6 +499,14 @@ export default function DeckDetailPage() {
             setShowGamesModal(false);
             router.push(`/decks/${deckId}/study?mode=game&game=${game}`);
           }}
+        />
+
+        <ConfirmDialog
+          open={showDeleteModal}
+          onOpenChange={setShowDeleteModal}
+          title="Eliminar deck"
+          description="Se eliminará el deck con todas sus cartas. Esta acción no se puede deshacer."
+          onConfirm={confirmDelete}
         />
 
         {/* Reset Progress Modal */}

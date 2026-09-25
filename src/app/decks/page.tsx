@@ -11,6 +11,7 @@ import { MoveDialog } from "@/components/move-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getDecks, deleteDeck, moveDeckToFolder, updateDeck } from "@/lib/queries/decks";
 import {
   getFolders,
@@ -94,13 +95,22 @@ export default function DecksPage() {
     loadAll();
   }, [loadAll]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this deck and all its cards?")) return;
+  const [pendingDeleteDeckId, setPendingDeleteDeckId] = useState<string | null>(null);
+  const [pendingDeleteFolder, setPendingDeleteFolder] = useState<Folder | null>(null);
+
+  const handleDelete = (id: string) => {
+    setPendingDeleteDeckId(id);
+  };
+
+  const confirmDeleteDeck = async () => {
+    if (!pendingDeleteDeckId) return;
     try {
-      await deleteDeck(id);
-      setDecks((prev) => prev.filter((d) => d.id !== id));
+      await deleteDeck(pendingDeleteDeckId);
+      setDecks((prev) => prev.filter((d) => d.id !== pendingDeleteDeckId));
     } catch (error) {
       console.error("Failed to delete deck:", error);
+    } finally {
+      setPendingDeleteDeckId(null);
     }
   };
 
@@ -288,14 +298,13 @@ export default function DecksPage() {
     }
   };
 
-  const handleDeleteFolder = async (folder: Folder) => {
-    const childCount = folders.filter((f) => f.parent_id === folder.id).length;
-    const deckCount = decks.filter((d) => (d.folder_id ?? null) === folder.id).length;
-    const detail =
-      childCount + deckCount > 0
-        ? ` Su contenido (${deckCount} deck(s), ${childCount} subcarpeta(s)) se moverá a la carpeta superior.`
-        : "";
-    if (!confirm(`Eliminar la carpeta "${folder.name}"?${detail}`)) return;
+  const handleDeleteFolder = (folder: Folder) => {
+    setPendingDeleteFolder(folder);
+  };
+
+  const confirmDeleteFolder = async () => {
+    const folder = pendingDeleteFolder;
+    if (!folder) return;
     try {
       await deleteFolder(
         folders,
@@ -311,8 +320,17 @@ export default function DecksPage() {
       await loadAll();
     } catch (error) {
       console.error("Failed to delete folder:", error);
+    } finally {
+      setPendingDeleteFolder(null);
     }
   };
+
+  const pendingFolderChildCount = pendingDeleteFolder
+    ? folders.filter((f) => f.parent_id === pendingDeleteFolder.id).length
+    : 0;
+  const pendingFolderDeckCount = pendingDeleteFolder
+    ? decks.filter((d) => (d.folder_id ?? null) === pendingDeleteFolder.id).length
+    : 0;
 
   const handleMoveSelect = async (targetFolderId: string | null) => {
     if (!moveDialog) return;
@@ -641,6 +659,30 @@ export default function DecksPage() {
             onSelect={handleMoveSelect}
           />
         )}
+
+        <ConfirmDialog
+          open={pendingDeleteDeckId !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingDeleteDeckId(null);
+          }}
+          title="Eliminar deck"
+          description="Se eliminará el deck con todas sus cartas. Esta acción no se puede deshacer."
+          onConfirm={confirmDeleteDeck}
+        />
+
+        <ConfirmDialog
+          open={pendingDeleteFolder !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingDeleteFolder(null);
+          }}
+          title={`Eliminar "${pendingDeleteFolder?.name ?? ""}"`}
+          description={
+            pendingFolderChildCount + pendingFolderDeckCount > 0
+              ? `Su contenido (${pendingFolderDeckCount} deck(s), ${pendingFolderChildCount} subcarpeta(s)) se moverá a la carpeta superior.`
+              : "La carpeta vacía se eliminará."
+          }
+          onConfirm={confirmDeleteFolder}
+        />
       </main>
     </AuthGuard>
   );
