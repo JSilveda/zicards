@@ -46,7 +46,7 @@ export function GuessIt({ cards, sourceLanguage, targetLanguage, onComplete, onP
     const wrongOptions = shuffledCards
       .filter((c) => c.id !== currentCard.id)
       .sort(() => Math.random() - 0.5)
-      .slice(0, 5)
+      .slice(0, 4)
       .map((c) => c.back);
     return [...wrongOptions, currentCard.back].sort(() => Math.random() - 0.5);
   }, [currentCard, shuffledCards]);
