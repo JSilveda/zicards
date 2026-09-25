@@ -750,7 +750,6 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
   const currentCard = cards[currentIndex];
   if (!currentCard) return null;
-  const upcomingCard = cards[currentIndex + 1];
   const isCurrentNew = newCardIds.has(currentCard.id) && !answeredCardIds.has(currentCard.id);
   const isCurrentReask = isReasking;
 
@@ -782,36 +781,18 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           )}
         </div>
 
-        <div className="relative mb-2 pb-6" style={{ touchAction: "pan-y" }}>
+        <div className="relative mb-2 pb-5" style={{ touchAction: "pan-y" }}>
           {/* Card stack behind: two solid layers peeking below the top card */}
           <div
             aria-hidden
-            className="absolute left-7 right-7 top-7 bottom-1 rounded-3xl border border-border bg-card shadow-lg"
+            className="absolute left-7 right-7 top-7 bottom-2 rounded-3xl border border-border bg-card shadow-lg"
             style={{ transform: "rotate(-3deg)" }}
           />
           <div
             aria-hidden
-            className="absolute left-3.5 right-3.5 top-3.5 bottom-2.5 rounded-3xl border border-border bg-card shadow-md"
+            className="absolute left-3.5 right-3.5 top-3.5 bottom-3 rounded-3xl border border-border bg-card shadow-md"
             style={{ transform: "rotate(2deg)" }}
           />
-
-          {/* Upcoming card, blurred beneath the top one */}
-          {upcomingCard && (
-            <div
-              aria-hidden
-              className={`absolute inset-0 pointer-events-none transition-all duration-300 ${
-                exit ? "scale-100 opacity-100" : "scale-[0.96] opacity-80"
-              }`}
-            >
-              <Card className="w-full h-full flex flex-col items-center justify-center p-8 blur-[2px]">
-                <CardContent className="text-center p-0 w-full">
-                  <h2 className="text-3xl font-bold text-center text-muted-foreground">
-                    <TermText text={upcomingCard.front} />
-                  </h2>
-                </CardContent>
-              </Card>
-            </div>
-          )}
 
           {/* Draggable top card */}
           <div
