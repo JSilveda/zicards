@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { Review } from "@/types";
-import { calculateNextReview, getNextReviewDate } from "@/lib/srs";
+import { calculateNextReview, getNextReviewDate, type ReviewGrade } from "@/lib/srs";
 
 interface ReviewRow {
   id: string;
@@ -78,7 +78,7 @@ export async function getDueCards(deckId: string) {
 
 async function submitReviewOnce(
   cardId: string,
-  correct: boolean
+  grade: ReviewGrade
 ): Promise<Review> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -92,14 +92,15 @@ async function submitReviewOnce(
     .maybeSingle();
 
   const currentBox = (existingReview as ReviewRow | null)?.box_number || 1;
-  const { nextBox, intervalDays } = calculateNextReview(currentBox, correct);
+  const { nextBox, intervalDays } = calculateNextReview(currentBox, grade);
   const nextReviewDate = getNextReviewDate(intervalDays);
+  const status = grade === "missed" ? "incorrect" : "correct";
 
   if (existingReview) {
     const { data, error } = await supabase
       .from("reviews")
       .update({
-        status: correct ? "correct" : "incorrect",
+        status,
         interval_days: intervalDays,
         next_review_date: nextReviewDate.toISOString(),
         box_number: nextBox,
@@ -117,7 +118,7 @@ async function submitReviewOnce(
       .insert({
         card_id: cardId,
         user_id: user.id,
-        status: correct ? "correct" : "incorrect",
+        status,
         interval_days: intervalDays,
         next_review_date: nextReviewDate.toISOString(),
         box_number: nextBox,
@@ -132,13 +133,13 @@ async function submitReviewOnce(
 
 export async function submitReview(
   cardId: string,
-  correct: boolean,
+  grade: ReviewGrade,
   maxRetries = 2
 ): Promise<Review> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await submitReviewOnce(cardId, correct);
+      return await submitReviewOnce(cardId, grade);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < maxRetries) {
@@ -151,7 +152,7 @@ export async function submitReview(
 
 export async function ensureReviewsExist(
   deckId: string,
-  answers: Map<string, boolean>
+  answers: Map<string, ReviewGrade>
 ): Promise<void> {
   if (answers.size === 0) return;
 
@@ -171,9 +172,9 @@ export async function ensureReviewsExist(
 
   for (const cardId of cardIds) {
     if (!reviewedIds.has(cardId)) {
-      const correct = answers.get(cardId) ?? false;
+      const grade = answers.get(cardId) ?? "missed";
       try {
-        await submitReview(cardId, correct);
+        await submitReview(cardId, grade);
       } catch (error) {
         console.error(`Failed to sync review for card ${cardId}:`, error);
       }

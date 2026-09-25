@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { speak, getLanguageVoiceCode } from "@/lib/tts";
 import { TermText } from "@/components/term-text";
 import { toPlainText } from "@/lib/terms";
+import type { ReviewGrade } from "@/lib/srs";
 import { submitReview, getDueCards, getReviewsForDeck, ensureReviewsExist } from "@/lib/queries/reviews";
 import { getCards } from "@/lib/queries/cards";
 import { LoadingPage } from "@/components/ui/loading";
-import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play } from "lucide-react";
+import { CheckCircle, XCircle, Volume2, Trophy, RotateCcw, Pause, Play, X, Undo2 } from "lucide-react";
 import type { Card as CardType, Deck } from "@/types";
 
 const PairIt = dynamic(() => import("@/components/games/pair-it").then((m) => m.PairIt), { ssr: false });
@@ -79,6 +81,7 @@ function clearProgressData(deckId: string, mode: string) {
 }
 
 export function StudySession({ deck, mode = "review", onProgress }: StudySessionProps) {
+  const router = useRouter();
   const [cards, setCards] = useState<CardType[]>([]);
   const [allCards, setAllCards] = useState<CardType[]>([]);
   const [batchIndex, setBatchIndex] = useState(0);
@@ -89,6 +92,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
+  const [effortCount, setEffortCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,6 +100,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [isPlaying, setIsPlaying] = useState(false);
 
   const [incorrectCardIds, setIncorrectCardIds] = useState<string[]>([]);
+  const [effortCardIds, setEffortCardIds] = useState<string[]>([]);
   const [isReasking, setIsReasking] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [pendingResume, setPendingResume] = useState<SavedProgress | null>(null);
@@ -103,9 +108,13 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set());
   const [answeredCardIds, setAnsweredCardIds] = useState<Set<string>>(new Set());
 
+  const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false });
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickRef = useRef(false);
+
   const batchesRef = useRef<CardType[][]>([]);
   const advanceRef = useRef<() => void>(() => {});
-  const answersRef = useRef<Map<string, boolean>>(new Map());
+  const answersRef = useRef<Map<string, ReviewGrade>>(new Map());
   const shuffledOrderRef = useRef<string[]>([]);
   const savedProgressHandledRef = useRef(false);
 
@@ -127,6 +136,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
         setCurrentIndex(0);
         setCorrectCount(0);
+        setEffortCount(0);
         setIncorrectCount(0);
         setNewCardIds(new Set());
       } else if (mode === "learn") {
@@ -191,6 +201,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
           setCurrentIndex(0);
         }
         setCorrectCount(0);
+        setEffortCount(0);
         setIncorrectCount(0);
       } else {
         const all = await getCards(deck.id);
@@ -208,12 +219,14 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
         setCurrentIndex(0);
         setCorrectCount(0);
+        setEffortCount(0);
         setIncorrectCount(0);
         setNewCardIds(new Set());
       }
       setIsComplete(false);
       setFlipped(false);
       setIncorrectCardIds([]);
+      setEffortCardIds([]);
       setIsReasking(false);
       if (!resume) {
         setAnsweredCardIds(new Set());
@@ -316,6 +329,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
       setPhase("flashcards");
       setGameIndex(0);
       setIncorrectCardIds([]);
+      setEffortCardIds([]);
       setIsReasking(false);
     } else {
       const answers = new Map(answersRef.current);
@@ -330,7 +344,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     }
   };
 
-  const handleAnswer = async (correct: boolean) => {
+  const handleGrade = async (grade: ReviewGrade) => {
     if (submitting) return;
     setSubmitting(true);
 
@@ -338,27 +352,40 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
     if (!currentCard) { setSubmitting(false); return; }
 
     try {
-      await submitReview(currentCard.id, correct);
+      await submitReview(currentCard.id, grade);
     } catch (error) {
       console.error("Failed to submit review:", error);
     }
 
-    answersRef.current.set(currentCard.id, correct);
+    answersRef.current.set(currentCard.id, grade);
 
-    const newCorrectCount = correct ? correctCount + 1 : correctCount;
-    const newIncorrectCount = correct ? incorrectCount : incorrectCount + 1;
-    setCorrectCount(newCorrectCount);
-    setIncorrectCount(newIncorrectCount);
-
-    let newIncorrectIds: string[];
-    if (correct) {
-      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+    if (grade === "easy") {
+      setCorrectCount((c) => c + 1);
+    } else if (grade === "effort") {
+      setEffortCount((c) => c + 1);
     } else {
-      newIncorrectIds = incorrectCardIds.includes(currentCard.id)
-        ? incorrectCardIds
-        : [...incorrectCardIds, currentCard.id];
+      setIncorrectCount((c) => c + 1);
     }
-    setIncorrectCardIds(newIncorrectIds);
+
+    const addUnique = (list: string[]) =>
+      list.includes(currentCard.id) ? list : [...list, currentCard.id];
+
+    let newIncorrectIds = incorrectCardIds;
+    let newEffortIds = effortCardIds;
+    if (grade === "missed") {
+      newIncorrectIds = addUnique(incorrectCardIds);
+      setIncorrectCardIds(newIncorrectIds);
+    } else if (grade === "effort") {
+      newEffortIds = addUnique(effortCardIds);
+      setEffortCardIds(newEffortIds);
+      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+      setIncorrectCardIds(newIncorrectIds);
+    } else {
+      newIncorrectIds = incorrectCardIds.filter((id) => id !== currentCard.id);
+      newEffortIds = effortCardIds.filter((id) => id !== currentCard.id);
+      setIncorrectCardIds(newIncorrectIds);
+      setEffortCardIds(newEffortIds);
+    }
     setAnsweredCardIds((prev) => {
       const next = new Set(prev);
       next.add(currentCard.id);
@@ -375,9 +402,10 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
     if (currentIndex + 1 >= cards.length) {
       if (mode === "learn") {
-        const uniqueIncorrect = [...new Set(newIncorrectIds)];
-        if (uniqueIncorrect.length > 0 && !isReasking) {
-          const reviewCards = uniqueIncorrect
+        const uniqueMissed = [...new Set(newIncorrectIds)];
+        const uniqueEffort = [...new Set(newEffortIds)];
+        if ((uniqueMissed.length > 0 || uniqueEffort.length > 0) && !isReasking) {
+          const reviewCards = [...uniqueMissed, ...uniqueEffort]
             .map((id) => cardMap.get(id))
             .filter(Boolean) as CardType[];
           if (reviewCards.length > 0) {
@@ -386,6 +414,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
             setCurrentIndex(0);
             setFlipped(false);
             setIncorrectCardIds([]);
+            setEffortCardIds([]);
             setSubmitting(false);
             return;
           }
@@ -396,6 +425,7 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         setFlipped(false);
         setIsReasking(false);
         setIncorrectCardIds([]);
+        setEffortCardIds([]);
       } else {
         clearProgressData(deck.id, mode);
         setIsComplete(true);
@@ -407,6 +437,70 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
 
     setSubmitting(false);
   };
+
+  const SWIPE_X = 110;
+  const SWIPE_UP = 110;
+
+  const onCardPointerDown = (e: React.PointerEvent) => {
+    if (!flipped || submitting) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ dx: 0, dy: 0, active: true });
+  };
+
+  const onCardPointerMove = (e: React.PointerEvent) => {
+    if (!drag.active || !dragStartRef.current) return;
+    setDrag({
+      dx: e.clientX - dragStartRef.current.x,
+      dy: e.clientY - dragStartRef.current.y,
+      active: true,
+    });
+  };
+
+  const resetDrag = () => {
+    dragStartRef.current = null;
+    setDrag({ dx: 0, dy: 0, active: false });
+  };
+
+  const onCardPointerUp = (e: React.PointerEvent) => {
+    if (!drag.active || !dragStartRef.current) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    dragStartRef.current = null;
+    suppressClickRef.current = Math.abs(dx) > 10 || Math.abs(dy) > 10;
+
+    if (Math.abs(dx) >= SWIPE_X && Math.abs(dx) >= Math.abs(dy)) {
+      const grade: ReviewGrade = dx > 0 ? "easy" : "missed";
+      setDrag({ dx: dx > 0 ? 600 : -600, dy, active: false });
+      setTimeout(() => {
+        setDrag({ dx: 0, dy: 0, active: false });
+        handleGrade(grade);
+      }, 180);
+      return;
+    }
+    if (dy <= -SWIPE_UP && Math.abs(dy) > Math.abs(dx)) {
+      setDrag({ dx: 0, dy: -600, active: false });
+      setTimeout(() => {
+        setDrag({ dx: 0, dy: 0, active: false });
+        handleGrade("effort");
+      }, 180);
+      return;
+    }
+    setDrag({ dx: 0, dy: 0, active: false });
+  };
+
+  const handleCardTap = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    handleFlipAndSpeak();
+  };
+
+  const swipeDir =
+    drag.dx > 40 ? "easy" : drag.dx < -40 ? "missed" : drag.dy < -40 ? "effort" : null;
+  const swipeIntensity = Math.min(Math.max(Math.abs(drag.dx), Math.abs(drag.dy)) / SWIPE_X, 1);
 
   const handleResume = () => {
     setShowResumeDialog(false);
@@ -474,12 +568,16 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
         <h2 className="text-2xl font-bold mb-2">Session Complete!</h2>
         <div className="flex gap-6 mb-6">
           <div className="text-center">
-            <p className="text-3xl font-bold text-green-500">{correctCount}</p>
-            <p className="text-sm text-muted-foreground">Correct</p>
+            <p className="text-3xl font-bold text-rose-500">{incorrectCount}</p>
+            <p className="text-sm text-muted-foreground">Missed</p>
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold text-red-500">{incorrectCount}</p>
-            <p className="text-sm text-muted-foreground">Incorrect</p>
+            <p className="text-3xl font-bold text-amber-500">{effortCount}</p>
+            <p className="text-sm text-muted-foreground">With effort</p>
+          </div>
+          <div className="text-center">
+            <p className="text-3xl font-bold text-emerald-500">{correctCount}</p>
+            <p className="text-sm text-muted-foreground">Easy</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold">{allCards.length}</p>
@@ -614,153 +712,249 @@ export function StudySession({ deck, mode = "review", onProgress }: StudySession
   return (
     <>
       <div className="max-w-2xl mx-auto p-4">
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <Badge variant="outline">
               {currentIndex + 1} / {cards.length}
             </Badge>
             <div className="flex gap-2">
-              <Badge variant="secondary" className="text-green-600">
-                {correctCount} correct
+              <Badge variant="secondary" className="text-rose-600">
+                {incorrectCount}
               </Badge>
-              <Badge variant="secondary" className="text-red-600">
-                {incorrectCount} incorrect
+              <Badge variant="secondary" className="text-amber-600">
+                {effortCount}
+              </Badge>
+              <Badge variant="secondary" className="text-emerald-600">
+                {correctCount}
               </Badge>
             </div>
           </div>
           {mode === "learn" && (
             <p className="text-xs text-muted-foreground mt-1">
               Batch {batchIndex + 1} of {totalBatches}
-              {isReasking && " · Reviewing missed cards"}
+              {isReasking && " · Reviewing difficult cards"}
             </p>
           )}
         </div>
 
-        <div
-          className="cursor-pointer mb-6"
-          onClick={handleFlipAndSpeak}
-          style={{ perspective: "1000px" }}
-        >
+        <div className="relative mb-2" style={{ touchAction: "pan-y" }}>
+          {/* Card stack behind */}
           <div
-            className="transition-transform duration-500 relative"
+            aria-hidden
+            className="absolute inset-x-5 top-4 bottom-0 rounded-3xl bg-muted/50"
+            style={{ transform: "rotate(-2.5deg)" }}
+          />
+          <div
+            aria-hidden
+            className="absolute inset-x-2.5 top-2 bottom-0 rounded-3xl bg-muted/80"
+            style={{ transform: "rotate(1.5deg)" }}
+          />
+
+          {/* Draggable top card */}
+          <div
+            key={currentCard.id}
+            className="relative cursor-grab active:cursor-grabbing select-none"
             style={{
-              transformStyle: "preserve-3d",
-              transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+              perspective: "1000px",
+              touchAction: "pan-y",
+              transform: `translate(${drag.dx}px, ${drag.dy}px) rotate(${drag.dx / 16}deg)`,
+              transition: drag.active ? "none" : "transform 0.25s ease",
             }}
+            onPointerDown={onCardPointerDown}
+            onPointerMove={onCardPointerMove}
+            onPointerUp={onCardPointerUp}
+            onPointerCancel={resetDrag}
+            onClick={handleCardTap}
           >
-            <Card
-              className="w-full min-h-[300px] flex flex-col items-center justify-center p-8"
-              style={{ backfaceVisibility: "hidden" }}
+            <div
+              className="transition-transform duration-500 relative"
+              style={{
+                transformStyle: "preserve-3d",
+                transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+              }}
             >
-              <CardContent className="text-center p-0">
-                <div className="flex justify-center gap-2 mb-4">
-                  {isCurrentNew && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      New
-                    </span>
+              <Card
+                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8"
+                style={{ backfaceVisibility: "hidden" }}
+              >
+                <CardContent className="text-center p-0 w-full">
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="text-xs font-medium text-muted-foreground">Question</span>
+                    <button
+                      className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/decks/${deck.id}`);
+                      }}
+                      aria-label="Exit session"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex justify-center gap-2 mb-4 min-h-[18px]">
+                    {isCurrentNew && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        New
+                      </span>
+                    )}
+                    {isCurrentReask && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        Review
+                      </span>
+                    )}
+                  </div>
+                  {currentCard.image_url && (
+                    <img
+                      src={currentCard.image_url}
+                      alt={toPlainText(currentCard.front)}
+                      draggable={false}
+                      className="max-h-32 rounded-lg object-cover mx-auto mb-4 pointer-events-none"
+                    />
                   )}
-                  {isCurrentReask && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                      Review
-                    </span>
+                  <h2 className="text-3xl font-bold mb-3 text-center">
+                    <TermText text={currentCard.front} />
+                  </h2>
+                  {currentCard.transcription && (
+                    <p className="text-muted-foreground mb-2">
+                      /{currentCard.transcription}/
+                    </p>
                   )}
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Tap to reveal answer
-                </p>
-                {currentCard.image_url && (
-                  <img
-                    src={currentCard.image_url}
-                    alt={toPlainText(currentCard.front)}
-                    className="max-h-36 rounded-lg object-cover mx-auto mb-4"
-                  />
-                )}
-                <h2 className="text-4xl font-bold mb-3">
-                  <TermText text={currentCard.front} />
-                </h2>
-                {currentCard.transcription && (
-                  <p className="text-muted-foreground mb-2">
-                    /{currentCard.transcription}/
-                  </p>
-                )}
-                {currentCard.gender && (
-                  <Badge variant="secondary">{currentCard.gender}</Badge>
-                )}
-                <div className="mt-4">
+                  {currentCard.gender && (
+                    <Badge variant="secondary">{currentCard.gender}</Badge>
+                  )}
+                  <div className="mt-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speak(currentCard.front, getLanguageVoiceCode(deck.source_language));
+                      }}
+                      aria-label="Listen"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="w-full min-h-[340px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
+                style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+              >
+                <CardContent className="text-center p-0 w-full">
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="text-xs font-medium text-muted-foreground">Answer</span>
+                    <button
+                      className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/decks/${deck.id}`);
+                      }}
+                      aria-label="Exit session"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {currentCard.image_url && (
+                    <img
+                      src={currentCard.image_url}
+                      alt={toPlainText(currentCard.back)}
+                      draggable={false}
+                      className="max-h-32 rounded-lg object-cover mx-auto mb-4 pointer-events-none"
+                    />
+                  )}
+                  <h2 className="text-3xl font-bold mb-3 text-center">
+                    <TermText text={currentCard.back} />
+                  </h2>
+                  {currentCard.example && (
+                    <p className="text-muted-foreground italic mb-4 max-w-sm mx-auto">
+                      &quot;
+                      <TermText text={currentCard.example} />
+                      &quot;
+                    </p>
+                  )}
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      speak(currentCard.front, getLanguageVoiceCode(deck.source_language));
+                      speak(currentCard.back, getLanguageVoiceCode(deck.target_language));
                     }}
+                    aria-label="Listen"
                   >
-                    <Volume2 className="h-4 w-4 mr-1" />
-                    Listen
+                    <Volume2 className="h-4 w-4" />
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card
-              className="w-full min-h-[300px] flex flex-col items-center justify-center p-8 absolute top-0 left-0"
-              style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-            >
-              <CardContent className="text-center p-0">
-                {currentCard.image_url && (
-                  <img
-                    src={currentCard.image_url}
-                    alt={toPlainText(currentCard.back)}
-                    className="max-h-36 rounded-lg object-cover mx-auto mb-4"
-                  />
-                )}
-                <h2 className="text-4xl font-bold mb-3">
-                  <TermText text={currentCard.back} />
-                </h2>
-                {currentCard.example && (
-                  <p className="text-muted-foreground italic mb-4 max-w-sm">
-                    &quot;
-                    <TermText text={currentCard.example} />
-                    &quot;
-                  </p>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speak(currentCard.back, getLanguageVoiceCode(deck.target_language));
-                  }}
+            {/* Swipe tint + stamp */}
+            {swipeDir && (
+              <div
+                className={`absolute inset-0 rounded-2xl pointer-events-none flex items-center justify-center ${
+                  swipeDir === "easy"
+                    ? "bg-emerald-500/15"
+                    : swipeDir === "missed"
+                    ? "bg-rose-500/15"
+                    : "bg-amber-500/15"
+                }`}
+                style={{ opacity: swipeIntensity }}
+              >
+                <span
+                  className={`text-3xl font-black tracking-widest ${
+                    swipeDir === "easy"
+                      ? "text-emerald-500"
+                      : swipeDir === "missed"
+                      ? "text-rose-500"
+                      : "text-amber-500"
+                  }`}
                 >
-                  <Volume2 className="h-4 w-4 mr-1" />
-                  Listen
-                </Button>
-              </CardContent>
-            </Card>
+                  {swipeDir === "easy" ? "EASY" : swipeDir === "missed" ? "MISSED" : "EFFORT"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {flipped && (
-          <div className="flex justify-center gap-4">
-            <Button
-              size="lg"
-              variant="outline"
-              className="gap-2 text-red-600 hover:text-red-600 hover:bg-red-50 min-w-[140px]"
-              onClick={() => handleAnswer(false)}
-              disabled={submitting}
-            >
-              <XCircle className="h-5 w-5" />
-              Incorrect
-            </Button>
-            <Button
-              size="lg"
-              className="gap-2 bg-green-600 hover:bg-green-700 min-w-[140px]"
-              onClick={() => handleAnswer(true)}
-              disabled={submitting}
-            >
-              <CheckCircle className="h-5 w-5" />
-              Correct
-            </Button>
+        {!flipped ? (
+          <p className="text-center text-sm text-muted-foreground mt-4 mb-2">
+            Tap to show answer
+          </p>
+        ) : (
+          <div className="mt-4 mb-2">
+            <p className="text-center font-semibold">Did the answer come to mind?</p>
+            <p className="text-center text-sm text-muted-foreground mb-4">
+              You can also swipe right, left or up to answer
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => handleGrade("missed")}
+                disabled={submitting}
+                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50 transition-colors disabled:opacity-50"
+              >
+                <XCircle className="h-5 w-5" />
+                Missed
+              </button>
+              <button
+                onClick={() => handleGrade("effort")}
+                disabled={submitting}
+                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+              >
+                <Undo2 className="h-5 w-5" />
+                With effort
+              </button>
+              <button
+                onClick={() => handleGrade("easy")}
+                disabled={submitting}
+                className="flex-1 max-w-[150px] flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold bg-teal-100 text-teal-800 hover:bg-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle className="h-5 w-5" />
+                Easy
+              </button>
+            </div>
           </div>
         )}
       </div>
