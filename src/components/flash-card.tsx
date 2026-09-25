@@ -172,7 +172,7 @@ export function FlashCard({
                 <TermText text={card.back} />
               </h2>
               {card.example && (
-                <p className="text-xs text-muted-foreground italic mb-2 max-w-xs">
+                <p className="text-xs text-muted-foreground italic mb-2 max-w-xs mx-auto">
                   &quot;
                   <TermText text={card.example} />
                   &quot;
