@@ -61,6 +61,12 @@ export async function deleteCard(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function clearDeckCards(deckId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("cards").delete().eq("deck_id", deckId);
+  if (error) throw error;
+}
+
 export async function createCards(
   cards: Omit<Card, "id" | "created_at" | "updated_at">[]
 ): Promise<Card[]> {

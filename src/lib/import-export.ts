@@ -94,8 +94,13 @@ export function parseCSVRows(text: string, delimiter: "," | ";"): string[][] {
   return rows;
 }
 
+/** A CSV row: card fields plus optional `id` for round-trip updates. */
+export interface ImportRow extends BackupCard {
+  id?: string;
+}
+
 export interface ParsedCardsCSV {
-  cards: BackupCard[];
+  cards: ImportRow[];
   errors: string[];
   delimiter: "," | ";";
 }
@@ -120,8 +125,9 @@ export function parseCardsCSV(text: string): ParsedCardsCSV {
 
   const idx: Record<string, number> = {};
   for (const f of CARD_FIELDS) idx[f] = header.indexOf(f);
+  const idIdx = header.indexOf("id");
 
-  const cards: BackupCard[] = [];
+  const cards: ImportRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const values = rows[i];
     const get = (f: (typeof CARD_FIELDS)[number]) =>
@@ -132,7 +138,9 @@ export function parseCardsCSV(text: string): ParsedCardsCSV {
       errors.push(`Fila ${i + 1}: falta front o back, se omite`);
       continue;
     }
-    const card: BackupCard = { front, back };
+    const card: ImportRow = { front, back };
+    const id = idIdx >= 0 ? (values[idIdx] ?? "").trim() : "";
+    if (id) card.id = id;
     for (const f of ["example", "transcription", "gender", "image_url"] as const) {
       const v = get(f);
       if (v) card[f] = v;
@@ -150,19 +158,23 @@ function escapeCSVField(value: string): string {
   return value;
 }
 
-export function cardsToCSV(cards: BackupCard[]): string {
-  const lines = ["front,back,example,transcription,gender,image_url"];
+export function cardsToCSV(cards: (BackupCard & { id?: string })[], includeId = false): string {
+  const lines = [
+    includeId
+      ? "id,front,back,example,transcription,gender,image_url"
+      : "front,back,example,transcription,gender,image_url",
+  ];
   for (const c of cards) {
-    lines.push(
-      [
-        escapeCSVField(c.front),
-        escapeCSVField(c.back),
-        escapeCSVField(c.example ?? ""),
-        escapeCSVField(c.transcription ?? ""),
-        escapeCSVField(c.gender ?? ""),
-        escapeCSVField(c.image_url ?? ""),
-      ].join(",")
-    );
+    const fields = [
+      escapeCSVField(c.front),
+      escapeCSVField(c.back),
+      escapeCSVField(c.example ?? ""),
+      escapeCSVField(c.transcription ?? ""),
+      escapeCSVField(c.gender ?? ""),
+      escapeCSVField(c.image_url ?? ""),
+    ];
+    if (includeId) fields.unshift(escapeCSVField(c.id ?? ""));
+    lines.push(fields.join(","));
   }
   return lines.join("\n");
 }
@@ -348,6 +360,105 @@ export function downloadFile(filename: string, content: string, mime: string) {
     URL.revokeObjectURL(link.href);
     link.remove();
   }, 1000);
+}
+
+export type ImportMode = "add" | "upsert" | "replace";
+
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+}
+
+const normText = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+
+/**
+ * Import rows into a deck with duplicate detection:
+ * - match by `id` column first (exact, survives front-text edits),
+ * - then by `front` text (case-insensitive).
+ * Modes: "add" (only new), "upsert" (update existing + add new),
+ * "replace" (delete deck cards first, then add all).
+ */
+export async function importCardsToDeck(
+  deckId: string,
+  rows: ImportRow[],
+  mode: ImportMode
+): Promise<ImportResult> {
+  const result: ImportResult = { created: 0, updated: 0, skipped: 0 };
+  if (rows.length === 0) return result;
+
+  const { getCards, createCards, updateCard, clearDeckCards } = await import(
+    "@/lib/queries/cards"
+  );
+
+  if (mode === "replace") {
+    await clearDeckCards(deckId);
+  }
+
+  const existing = mode === "replace" ? [] : await getCards(deckId);
+  const byId = new Map(existing.map((c) => [c.id, c]));
+  const byFront = new Map(existing.map((c) => [normText(c.front), c]));
+
+  const toCreate: ImportRow[] = [];
+  const toUpdate: { id: string; patch: Record<string, string | null> }[] = [];
+
+  for (const row of rows) {
+    const match = (row.id && byId.get(row.id)) || byFront.get(normText(row.front));
+    if (!match) {
+      toCreate.push(row);
+      continue;
+    }
+    if (mode === "add") {
+      result.skipped++;
+      continue;
+    }
+    const patch = {
+      front: row.front.trim(),
+      back: row.back.trim(),
+      example: row.example?.trim() || null,
+      transcription: row.transcription?.trim() || null,
+      gender: row.gender?.trim() || null,
+      image_url: row.image_url?.trim() || null,
+    };
+    const changed =
+      normText(match.front) !== normText(patch.front) ||
+      normText(match.back) !== normText(patch.back) ||
+      normText(match.example) !== normText(patch.example) ||
+      normText(match.transcription) !== normText(patch.transcription) ||
+      normText(match.gender) !== normText(patch.gender) ||
+      normText(match.image_url) !== normText(patch.image_url);
+    if (changed) {
+      toUpdate.push({ id: match.id, patch });
+    } else {
+      result.skipped++;
+    }
+  }
+
+  const CHUNK = 200;
+  for (let i = 0; i < toCreate.length; i += CHUNK) {
+    await createCards(
+      toCreate.slice(i, i + CHUNK).map((c) => ({
+        deck_id: deckId,
+        front: c.front.trim(),
+        back: c.back.trim(),
+        example: c.example?.trim() || null,
+        transcription: c.transcription?.trim() || null,
+        gender: c.gender?.trim() || null,
+        image_url: c.image_url?.trim() || null,
+      }))
+    );
+    result.created += Math.min(CHUNK, toCreate.length - i);
+  }
+
+  const UPDATE_CHUNK = 25;
+  for (let i = 0; i < toUpdate.length; i += UPDATE_CHUNK) {
+    await Promise.all(
+      toUpdate.slice(i, i + UPDATE_CHUNK).map((u) => updateCard(u.id, u.patch))
+    );
+    result.updated += Math.min(UPDATE_CHUNK, toUpdate.length - i);
+  }
+
+  return result;
 }
 
 export function safeFilename(name: string): string {

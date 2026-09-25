@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createCards, getCards } from "@/lib/queries/cards";
+import { getCards } from "@/lib/queries/cards";
 import {
   parseCardsCSV,
   parseBackupFile,
@@ -12,7 +13,9 @@ import {
   downloadFile,
   safeFilename,
   todayStamp,
-  type BackupCard,
+  importCardsToDeck,
+  type ImportRow,
+  type ImportMode,
 } from "@/lib/import-export";
 import { Upload, FileSpreadsheet, FileJson, AlertCircle, CheckCircle, Download } from "lucide-react";
 
@@ -24,11 +27,12 @@ interface ImportExportProps {
 
 export function ImportExport({ deckId, deckName, onImportComplete }: ImportExportProps) {
   const [fileName, setFileName] = useState<string | null>(null);
-  const [parsedCards, setParsedCards] = useState<BackupCard[]>([]);
+  const [parsedCards, setParsedCards] = useState<ImportRow[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [mode, setMode] = useState<ImportMode>("upsert");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -37,7 +41,7 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
     setFileName(selected.name);
     setParsedCards([]);
     setErrors([]);
-    setSuccess(false);
+    setSuccess(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -65,24 +69,18 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
 
   const handleImport = async () => {
     if (parsedCards.length === 0) return;
+    if (mode === "replace" && !confirm("Se eliminarán todas las cartas actuales del deck antes de importar. ¿Continuar?")) {
+      return;
+    }
 
     setImporting(true);
     try {
-      const CHUNK = 200;
-      for (let i = 0; i < parsedCards.length; i += CHUNK) {
-        await createCards(
-          parsedCards.slice(i, i + CHUNK).map((card) => ({
-            deck_id: deckId,
-            front: card.front,
-            back: card.back,
-            example: card.example || null,
-            transcription: card.transcription || null,
-            gender: card.gender || null,
-            image_url: card.image_url || null,
-          }))
-        );
-      }
-      setSuccess(true);
+      const result = await importCardsToDeck(deckId, parsedCards, mode);
+      const parts: string[] = [];
+      if (result.created > 0) parts.push(`${result.created} creada(s)`);
+      if (result.updated > 0) parts.push(`${result.updated} actualizada(s)`);
+      if (result.skipped > 0) parts.push(`${result.skipped} sin cambios`);
+      setSuccess(`Importación lista: ${parts.join(", ") || "sin cambios"}.`);
       setParsedCards([]);
       setFileName(null);
       onImportComplete?.();
@@ -104,13 +102,15 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
           `${base}-${todayStamp()}.csv`,
           cardsToCSV(
             cards.map((c) => ({
+              id: c.id,
               front: c.front,
               back: c.back,
               example: c.example || undefined,
               transcription: c.transcription || undefined,
               gender: c.gender || undefined,
               image_url: c.image_url || undefined,
-            }))
+            })),
+            true
           ),
           "text/csv"
         );
@@ -212,10 +212,27 @@ export function ImportExport({ deckId, deckName, onImportComplete }: ImportExpor
             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
               <p className="text-sm text-green-600 flex items-center gap-1">
                 <CheckCircle className="h-4 w-4" />
-                ¡Cartas importadas correctamente!
+                {success}
               </p>
             </div>
           )}
+
+          <div>
+            <label className="text-sm font-medium">Cómo importar</label>
+            <Select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as ImportMode)}
+              options={[
+                { value: "upsert", label: "Actualizar existentes y agregar nuevas" },
+                { value: "add", label: "Solo agregar nuevas (omitir repetidas)" },
+                { value: "replace", label: "Reemplazar todo el deck" },
+              ]}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Detecta repetidas por columna <code className="bg-muted px-1 rounded">id</code> o por
+              texto de <code className="bg-muted px-1 rounded">front</code>.
+            </p>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <Button

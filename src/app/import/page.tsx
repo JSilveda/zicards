@@ -29,6 +29,9 @@ import {
   CSV_TEMPLATE,
   type BackupCard,
   type BackupFile,
+  type ImportRow,
+  type ImportMode,
+  importCardsToDeck,
 } from "@/lib/import-export";
 import {
   ArrowLeft,
@@ -85,7 +88,8 @@ function ImportExportPage() {
 
   // ---- Import state
   const [fileName, setFileName] = useState<string | null>(null);
-  const [csvCards, setCsvCards] = useState<BackupCard[] | null>(null);
+  const [csvCards, setCsvCards] = useState<ImportRow[] | null>(null);
+  const [csvMode, setCsvMode] = useState<ImportMode>("upsert");
   const [backup, setBackup] = useState<BackupFile | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [csvTarget, setCsvTarget] = useState<"existing" | "new">("existing");
@@ -186,13 +190,15 @@ function ImportExportPage() {
             `${base}-${todayStamp()}.csv`,
             cardsToCSV(
               cards.map((c) => ({
+                id: c.id,
                 front: c.front,
                 back: c.back,
                 example: c.example || undefined,
                 transcription: c.transcription || undefined,
                 gender: c.gender || undefined,
                 image_url: c.image_url || undefined,
-              }))
+              })),
+              true
             ),
             "text/csv"
           );
@@ -331,9 +337,16 @@ function ImportExportPage() {
         if (csvCards.length === 0) throw new Error("No hay cartas para importar");
         if (csvTarget === "existing") {
           if (!csvDeckId) throw new Error("Selecciona un deck de destino");
-          await createCardsChunked(csvDeckId, csvCards);
+          if (csvMode === "replace" && !confirm("Se eliminarán todas las cartas actuales del deck antes de importar. ¿Continuar?")) {
+            return;
+          }
+          const result = await importCardsToDeck(csvDeckId, csvCards, csvMode);
           const deck = decks.find((d) => d.id === csvDeckId);
-          setImportResult(`Se agregaron ${csvCards.length} carta(s) al deck "${deck?.name ?? ""}".`);
+          const parts: string[] = [];
+          if (result.created > 0) parts.push(`${result.created} creada(s)`);
+          if (result.updated > 0) parts.push(`${result.updated} actualizada(s)`);
+          if (result.skipped > 0) parts.push(`${result.skipped} sin cambios`);
+          setImportResult(`Deck "${deck?.name ?? ""}": ${parts.join(", ") || "sin cambios"}.`);
         } else {
           if (!newDeckName.trim()) throw new Error("Escribe un nombre para el nuevo deck");
           const { createClient } = await import("@/lib/supabase/client");
@@ -625,12 +638,30 @@ function ImportExportPage() {
                           </Button>
                         </div>
                         {csvTarget === "existing" ? (
-                          <Select
-                            value={csvDeckId}
-                            onChange={(e) => setCsvDeckId(e.target.value)}
-                            placeholder="Selecciona un deck"
-                            options={decks.map((d) => ({ value: d.id, label: deckLabel(d) }))}
-                          />
+                          <div className="space-y-3">
+                            <Select
+                              value={csvDeckId}
+                              onChange={(e) => setCsvDeckId(e.target.value)}
+                              placeholder="Selecciona un deck"
+                              options={decks.map((d) => ({ value: d.id, label: deckLabel(d) }))}
+                            />
+                            <div>
+                              <label className="text-sm font-medium">Cómo importar</label>
+                              <Select
+                                value={csvMode}
+                                onChange={(e) => setCsvMode(e.target.value as ImportMode)}
+                                options={[
+                                  { value: "upsert", label: "Actualizar existentes y agregar nuevas" },
+                                  { value: "add", label: "Solo agregar nuevas (omitir repetidas)" },
+                                  { value: "replace", label: "Reemplazar todo el deck" },
+                                ]}
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Detecta repetidas por columna <code className="bg-muted px-1 rounded">id</code> o
+                                por texto de <code className="bg-muted px-1 rounded">front</code>.
+                              </p>
+                            </div>
+                          </div>
                         ) : (
                           <div className="space-y-3">
                             <Input
@@ -746,8 +777,17 @@ function ImportExportPage() {
                         <code className="bg-muted px-1 rounded">gender</code>,{" "}
                         <code className="bg-muted px-1 rounded">image_url</code>
                       </li>
+                      <li>
+                        Opcional <code className="bg-muted px-1 rounded">id</code>: lo incluye el
+                        export. Al reimportar, esa fila actualiza la carta exacta aunque hayas
+                        cambiado su <code className="bg-muted px-1 rounded">front</code>.
+                      </li>
                       <li>Si un texto lleva comas o saltos de línea, enciérralo entre comillas.</li>
                       <li>Se acepta coma (,) o punto y coma (;) como separador (Excel en español usa ;).</li>
+                      <li>
+                        Modos al importar a un deck existente: actualizar existentes y agregar nuevas,
+                        solo agregar nuevas, o reemplazar todo el deck.
+                      </li>
                     </ul>
                     <pre className="bg-muted rounded-lg p-3 text-xs overflow-x-auto">
                       {`front,back,example,transcription,gender,image_url\nHola,Hello,"Hello, how are you?",,,\nGracias,Thank you,,,,,`}
@@ -847,7 +887,11 @@ function ImportExportPage() {
                       idiomas y carpeta); para JSON, opcionalmente una carpeta base donde anidar todo.
                     </p>
                     <p>
-                      <strong>4.</strong> Pulsa Importar y verás el resumen (carpetas, decks y cartas creadas).
+                      <strong>4.</strong> Si importas CSV a un deck existente, elige el modo (actualizar,
+                      solo agregar o reemplazar). Las filas se detectan por <code className="bg-muted px-1 rounded">id</code> o
+                      por texto de <code className="bg-muted px-1 rounded">front</code>: edita el CSV y reimpórtalo
+                      para actualizar sin duplicar.
+                      <strong>5.</strong> Pulsa Importar y verás el resumen (creadas, actualizadas, sin cambios).
                     </p>
                   </CardContent>
                 </Card>
