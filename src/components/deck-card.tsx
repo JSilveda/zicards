@@ -90,18 +90,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
         className="relative cursor-pointer group"
         onClick={handleCardClick}
       >
-        {/* Stacked cards effect */}
         <div className="relative">
-          {/* Back card (shadow) */}
-          <div
-            className="absolute inset-x-1 top-1 h-full rounded-2xl border border-border/50 bg-muted/30"
-            style={{ transform: "rotate(1.5deg)" }}
-          />
-          {/* Middle card */}
-          <div
-            className="absolute inset-x-0.5 top-0.5 h-full rounded-2xl border border-border/50 bg-muted/50"
-            style={{ transform: "rotate(-0.75deg)" }}
-          />
           {/* Front card */}
           <div className="relative rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all">
             <div className="p-4">
