@@ -93,6 +93,14 @@ body {
   padding-inline: 0;
 }
 
+/* Notes editor: blend the editor box into the page background (both modes) */
+.notes-editor-flush .bn-container,
+.notes-editor-flush .bn-editor {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 .animate-in {
   animation: animate-in 0.2s ease-out;
 }
