@@ -69,13 +69,20 @@ export function DashboardStats() {
           <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.weeklyProgress}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="day" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" className="opacity-60" />
+                <XAxis dataKey="day" fontSize={12} tick={{ fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis fontSize={12} tick={{ fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "var(--card)",
+                    borderColor: "var(--border)",
+                    borderRadius: "8px",
+                    color: "var(--foreground)",
+                  }}
+                />
                 <Bar
                   dataKey="cardsStudied"
-                  fill="hsl(var(--primary))"
+                  fill="var(--primary)"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>

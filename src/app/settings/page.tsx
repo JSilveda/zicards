@@ -139,7 +139,7 @@ export default function SettingsPage() {
             <Input type="file" accept="image/*" onChange={handleFile} disabled={saving} />
 
             {message && (
-              <p className={`text-sm flex items-center gap-1 ${message.ok ? "text-green-600" : "text-destructive"}`}>
+              <p className={`text-sm flex items-center gap-1 ${message.ok ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
                 {message.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {message.text}
               </p>
@@ -168,7 +168,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {installed ? (
-              <p className="text-sm text-green-600 flex items-center gap-1">
+              <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <CheckCircle className="h-4 w-4" />
                 ZiCards ya está instalada como app.
               </p>

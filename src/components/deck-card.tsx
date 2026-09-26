@@ -151,7 +151,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
 
                 {/* Due badge */}
                 {dueCount > 0 && (
-                  <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full shrink-0">
+                  <Badge className="bg-red-500 text-white dark:bg-red-500/25 dark:text-red-200 text-xs px-2 py-0.5 rounded-full shrink-0">
                     {dueCount > 99 ? "99+" : dueCount}
                   </Badge>
                 )}
@@ -279,7 +279,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
                 }}
               >
                 <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
-                  <Play className="h-6 w-6 text-green-600" fill="currentColor" />
+                  <Play className="h-6 w-6 text-green-600 dark:text-green-400" fill="currentColor" />
                 </div>
                 <div>
                   <p className="font-semibold text-lg">Learn</p>
@@ -298,7 +298,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
                 }}
               >
                 <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                  <BookOpen className="h-6 w-6 text-blue-600" />
+                  <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="font-semibold text-lg">Review words</p>

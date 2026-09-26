@@ -762,7 +762,7 @@ function ImportExportPage() {
 
                   {importResult && (
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                      <p className="text-sm text-green-600 flex items-center gap-1">
+                      <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                         <CheckCircle className="h-4 w-4" />
                         {importResult}
                       </p>

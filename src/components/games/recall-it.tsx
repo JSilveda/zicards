@@ -262,7 +262,7 @@ export function RecallIt({ cards, sourceLanguage, targetLanguage, onComplete, on
         <Button
           size="lg"
           variant="outline"
-          className="gap-2 text-red-600 min-w-[140px]"
+            className="gap-2 text-red-600 dark:text-red-400 min-w-[140px]"
           onClick={() => handleRecall(false)}
           disabled={!revealed}
         >

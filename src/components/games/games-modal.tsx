@@ -17,28 +17,28 @@ export function GamesModal({ open, onClose, onSelect }: GamesModalProps) {
       name: "Pair It",
       description: "Match words with translations",
       icon: Link2,
-      color: "bg-blue-100 dark:bg-blue-900/30 text-blue-600",
+      color: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
     },
     {
       id: "guess-it",
       name: "Guess It",
       description: "Multiple choice quiz",
       icon: MessageCircle,
-      color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600",
+      color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
     },
     {
       id: "recall-it",
       name: "Recall It",
       description: "Remember and recall words",
       icon: Brain,
-      color: "bg-orange-100 dark:bg-orange-900/30 text-orange-600",
+      color: "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
     },
     {
       id: "type-it",
       name: "Type It",
       description: "Type the translation",
       icon: Keyboard,
-      color: "bg-green-100 dark:bg-green-900/30 text-green-600",
+      color: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
     },
   ];
 

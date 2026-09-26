@@ -163,6 +163,11 @@ function NavbarInner() {
               );
             })}
             <hr className="my-2" />
+            <div className="flex items-center justify-between px-2">
+              <span className="text-sm text-muted-foreground">Theme</span>
+              <ThemeToggle />
+            </div>
+            <hr className="my-2" />
             <Link href="/settings" onClick={() => setMobileOpen(false)}>
               <Button variant="ghost" className="w-full justify-start gap-2">
                 <Settings className="h-4 w-4" />

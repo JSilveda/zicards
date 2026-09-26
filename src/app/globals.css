@@ -24,23 +24,26 @@
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #0a0a0a;
-  --card-foreground: #fafafa;
+  /* Softened dark palette: off-black surfaces, off-white text (less eye strain) */
+  --background: #121212;
+  --foreground: #f2f2f2;
+  --card: #1b1b1f;
+  --card-foreground: #f2f2f2;
   --primary: #818cf8;
   --primary-foreground: #0a0a0a;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
+  --secondary: #26262b;
+  --secondary-foreground: #f2f2f2;
+  --muted: #26262b;
+  --muted-foreground: #a8a8b3;
+  --accent: #26262b;
+  --accent-foreground: #f2f2f2;
   --destructive: #7f1d1d;
-  --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
+  --destructive-foreground: #f2f2f2;
+  --border: #2c2c31;
+  --input: #2c2c31;
   --ring: #818cf8;
+  /* Pure-black shadows in dark mode instead of light-mode gray ones */
+  --tw-shadow-color: rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
