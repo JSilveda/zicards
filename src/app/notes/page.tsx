@@ -512,6 +512,26 @@ export default function NotesPage() {
                 <Input
                   value={title}
                   onChange={(e) => handleTitleChange(e.target.value)}
+                  onPaste={(e) => {
+                    // Mobile browsers truncate multi-line pastes in single-line
+                    // inputs to the first line; desktop joins them. Normalize so
+                    // nothing is silently lost on either platform.
+                    const text = e.clipboardData.getData("text");
+                    if (text && /[\r\n]/.test(text)) {
+                      e.preventDefault();
+                      const flat = text.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+                      const el = e.currentTarget;
+                      const start = el.selectionStart ?? title.length;
+                      const end = el.selectionEnd ?? title.length;
+                      const next = title.slice(0, start) + flat + title.slice(end);
+                      handleTitleChange(next);
+                      requestAnimationFrame(() => {
+                        try {
+                          el.setSelectionRange(start + flat.length, start + flat.length);
+                        } catch {}
+                      });
+                    }
+                  }}
                   placeholder="Untitled"
                   className="border-0 px-1 text-3xl font-bold shadow-none focus-visible:ring-0 h-auto py-1"
                 />
