@@ -533,7 +533,7 @@ export default function NotesPage() {
                     }
                   }}
                   placeholder="Untitled"
-                  className="border-0 px-1 text-3xl font-bold shadow-none focus-visible:ring-0 h-auto py-1"
+                  className="border-0 px-0 text-3xl font-bold shadow-none focus-visible:ring-0 h-auto py-1"
                 />
 
                 <div className="mt-2">
