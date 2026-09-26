@@ -30,12 +30,15 @@ export function NotesEditor({ pageId, initialContent, onChange }: NotesEditorPro
   });
 
   return (
-    <BlockNoteView
-      key={pageId}
-      editor={editor}
-      theme={dark ? "dark" : "light"}
-      onChange={() => onChange(editor.document)}
-      className="min-h-[50vh]"
-    />
+    <div className="notes-editor-flush">
+      <BlockNoteView
+        key={pageId}
+        editor={editor}
+        theme={dark ? "dark" : "light"}
+        sideMenu={false}
+        onChange={() => onChange(editor.document)}
+        className="min-h-[50vh]"
+      />
+    </div>
   );
 }

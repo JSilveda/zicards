@@ -75,6 +75,11 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Notes editor: remove the side-menu gutter so text aligns with the title */
+.notes-editor-flush .bn-editor {
+  padding-inline: 0;
+}
+
 .animate-in {
   animation: animate-in 0.2s ease-out;
 }
