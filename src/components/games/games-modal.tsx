@@ -60,7 +60,7 @@ export function GamesModal({ open, onClose, onSelect }: GamesModalProps) {
           <h3 className="font-semibold text-lg">Choose a Game</h3>
         </div>
 
-        <div className="divide-y">
+        <div className="divide-y divide-border">
           {games.map((game) => {
             const Icon = game.icon;
             return (

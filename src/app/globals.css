@@ -46,6 +46,16 @@
   --tw-shadow-color: rgb(0 0 0 / 0.55);
 }
 
+@layer base {
+  /* Bare `border` utilities default to currentColor in Tailwind v4;
+     use the theme border color instead (both modes). */
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

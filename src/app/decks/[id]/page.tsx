@@ -419,7 +419,7 @@ export default function DeckDetailPage() {
               >
                 ✕
               </button>
-              <div className="divide-y">
+              <div className="divide-y divide-border">
                 <button
                   className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
                   onClick={() => {

@@ -269,7 +269,7 @@ export function DeckCard({ deck, onDelete, onMove }: DeckCardProps) {
               ✕
             </button>
 
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {/* Learn */}
               <button
                 className="w-full flex items-center gap-4 p-5 hover:bg-muted/50 transition-colors text-left"
