@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/navbar";
 import { DashboardStats } from "@/components/dashboard-stats";
+import { InstallBanner } from "@/components/install-banner";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -26,6 +27,7 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
+        <InstallBanner />
         <DashboardStats />
       </main>
     </AuthGuard>
