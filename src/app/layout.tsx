@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppEffects } from "@/components/app-effects";
+import { BrandingEffects } from "@/components/branding-effects";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,18 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ZiCards - Master Languages with Flashcards",
   description: "Learn languages faster with spaced repetition flashcards",
-  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/icons/icon.svg", type: "image/svg+xml" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "ZiCards",
   },
 };
 
@@ -57,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col antialiased">
-        <AppEffects />
+        <BrandingEffects />
         {children}
       </body>
     </html>

@@ -13,12 +13,9 @@ import { getUserSettings, saveUserLogo } from "@/lib/queries/user-settings";
 import { fileToLogoDataUrl, useBranding } from "@/lib/branding";
 import {
   ArrowLeft,
-  ImagePlus,
   RotateCcw,
   CheckCircle,
   AlertCircle,
-  Download,
-  Smartphone,
   Palette,
 } from "lucide-react";
 
@@ -26,39 +23,12 @@ export default function SettingsPage() {
   const { logo, setLogo } = useBranding();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [installAvailable, setInstallAvailable] = useState(false);
-  const [installed, setInstalled] = useState(false);
-  const [swStatus, setSwStatus] = useState("Verificando…");
 
   useEffect(() => {
     getUserSettings()
       .then((s) => setLogo(s?.logo_data ?? null))
       .catch(() => {});
   }, [setLogo]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.__pwaInstallPrompt) setInstallAvailable(true);
-    const onAvailable = () => setInstallAvailable(true);
-    window.addEventListener("pwa-install-available", onAvailable);
-    const mq = window.matchMedia("(display-mode: standalone)");
-    setInstalled(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setInstalled(e.matches);
-    mq.addEventListener("change", onChange);
-
-    if (!("serviceWorker" in navigator)) {
-      setSwStatus("No soportado por este navegador");
-    } else {
-      navigator.serviceWorker
-        .getRegistration()
-        .then((reg) => setSwStatus(reg?.active ? "Activo" : reg ? "Instalando…" : "No registrado"))
-        .catch(() => setSwStatus("No disponible"));
-    }
-    return () => {
-      window.removeEventListener("pwa-install-available", onAvailable);
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,14 +70,6 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleInstall = async () => {
-    const prompt = window.__pwaInstallPrompt as (Event & { prompt?: () => void }) | null | undefined;
-    if (!prompt) return;
-    if (prompt.prompt) prompt.prompt();
-    window.__pwaInstallPrompt = null;
-    setInstallAvailable(false);
   };
 
   return (
@@ -162,44 +124,6 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Nota: los iconos de instalación de la PWA usan el logo predeterminado, ya que se
-              definen al instalar la app.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Smartphone className="h-5 w-5" />
-              Instalar app
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {installed ? (
-              <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                <CheckCircle className="h-4 w-4" />
-                ZiCards ya está instalada como app.
-              </p>
-            ) : installAvailable ? (
-              <Button onClick={handleInstall} className="gap-2">
-                <Download className="h-4 w-4" />
-                Instalar ZiCards
-              </Button>
-            ) : (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p className="flex items-center gap-1">
-                  <ImagePlus className="h-4 w-4" />
-                  Usa tu navegador para instalarla:
-                </p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Chrome / Edge (PC y Android): menú ⋯ → “Instalar” o “Agregar a pantalla principal”.</li>
-                  <li>iPhone (Safari): Compartir → “Agregar a pantalla de inicio”.</li>
-                </ul>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">Service worker: {swStatus}</p>
           </CardContent>
         </Card>
       </main>
