@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [installAvailable, setInstallAvailable] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [swStatus, setSwStatus] = useState("Verificando…");
 
   useEffect(() => {
     getUserSettings()
@@ -44,6 +45,15 @@ export default function SettingsPage() {
     setInstalled(mq.matches);
     const onChange = (e: MediaQueryListEvent) => setInstalled(e.matches);
     mq.addEventListener("change", onChange);
+
+    if (!("serviceWorker" in navigator)) {
+      setSwStatus("No soportado por este navegador");
+    } else {
+      navigator.serviceWorker
+        .getRegistration()
+        .then((reg) => setSwStatus(reg?.active ? "Activo" : reg ? "Instalando…" : "No registrado"))
+        .catch(() => setSwStatus("No disponible"));
+    }
     return () => {
       window.removeEventListener("pwa-install-available", onAvailable);
       mq.removeEventListener("change", onChange);
@@ -189,6 +199,7 @@ export default function SettingsPage() {
                 </ul>
               </div>
             )}
+            <p className="text-xs text-muted-foreground">Service worker: {swStatus}</p>
           </CardContent>
         </Card>
       </main>

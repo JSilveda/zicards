@@ -6,11 +6,10 @@ import { Download, X, Share } from "lucide-react";
 
 const DISMISSED_KEY = "pwa-banner-dismissed";
 
-/** Proactive install banner: native prompt when available, iOS instructions otherwise. */
+/** Proactive install banner: native prompt when available, manual guide otherwise. */
 export function InstallBanner() {
   const [visible, setVisible] = useState(false);
-  const [canPrompt, setCanPrompt] = useState(false);
-  const [isIos, setIsIos] = useState(false);
+  const [mode, setMode] = useState<"prompt" | "manual" | "ios">("manual");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -19,21 +18,40 @@ export function InstallBanner() {
 
     const ua = window.navigator.userAgent;
     const ios = /iphone|ipad|ipod/i.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
-    setIsIos(ios);
+    if (ios) {
+      setMode("ios");
+      setVisible(true);
+      return;
+    }
     if (window.__pwaInstallPrompt) {
-      setCanPrompt(true);
+      setMode("prompt");
       setVisible(true);
-    } else if (ios) {
-      setVisible(true);
+      return;
     }
 
     const onAvailable = () => {
       if (localStorage.getItem(DISMISSED_KEY)) return;
-      setCanPrompt(true);
+      setMode("prompt");
       setVisible(true);
     };
     window.addEventListener("pwa-install-available", onAvailable);
-    return () => window.removeEventListener("pwa-install-available", onAvailable);
+
+    // Fallback: Chrome suppresses the event for months if it was dismissed
+    // before, and in-app browsers never fire it. Still show manual steps.
+    const fallback = setTimeout(() => {
+      if (localStorage.getItem(DISMISSED_KEY)) return;
+      if (window.__pwaInstallPrompt) {
+        setMode("prompt");
+      } else {
+        setMode("manual");
+      }
+      setVisible(true);
+    }, 2500);
+
+    return () => {
+      window.removeEventListener("pwa-install-available", onAvailable);
+      clearTimeout(fallback);
+    };
   }, []);
 
   if (!visible) return null;
@@ -53,17 +71,23 @@ export function InstallBanner() {
   return (
     <div className="mb-6 flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-        {canPrompt ? <Download className="h-5 w-5 text-primary" /> : <Share className="h-5 w-5 text-primary" />}
+        {mode === "prompt" ? (
+          <Download className="h-5 w-5 text-primary" />
+        ) : (
+          <Share className="h-5 w-5 text-primary" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-sm">Instala ZiCards en tu teléfono</p>
         <p className="text-xs text-muted-foreground">
-          {canPrompt
+          {mode === "prompt"
             ? "Acceso rápido desde tu pantalla principal, funciona sin conexión."
-            : "En Safari toca Compartir → “Agregar a pantalla de inicio”."}
+            : mode === "ios"
+            ? "En Safari toca Compartir → “Agregar a pantalla de inicio”."
+            : "En el menú ⋯ de tu navegador elige “Instalar app” o “Agregar a pantalla principal”."}
         </p>
       </div>
-      {canPrompt && (
+      {mode === "prompt" && (
         <Button size="sm" onClick={handleInstall} className="shrink-0">
           Instalar
         </Button>
