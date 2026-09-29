@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Volume2,
   Square,
+  MoreHorizontal,
 } from "lucide-react";
 import { speak } from "@/lib/tts";
 import { blocksToPlainText, detectSpokenLang } from "@/lib/notes";
@@ -66,6 +67,8 @@ export default function NotesPage() {
 
   const [title, setTitle] = useState("");
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<NotePage | null>(null);
@@ -114,12 +117,24 @@ export default function NotesPage() {
 
   const selected = pages.find((p) => p.id === selectedId) || null;
 
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [moreMenuOpen]);
+
   // Sync title editor when selection changes
   useEffect(() => {
     setTitle(selected?.title ?? "");
     setLastSavedAt(selected?.updated_at ?? null);
     setSaveStatus("saved");
     setIconPickerOpen(false);
+    setMoreMenuOpen(false);
     contentRef.current = selected?.content ?? null;
     try {
       window.speechSynthesis?.cancel();
@@ -517,16 +532,93 @@ export default function NotesPage() {
                       </span>
                     )}
                   </span>
+                  <div className="relative" ref={moreMenuRef}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                      title="Opciones de nota"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    {moreMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-60 rounded-xl border bg-card shadow-lg z-20 overflow-hidden">
+                        <div className="px-4 pt-3 pb-1">
+                          <p className="text-xs font-medium text-muted-foreground">Tamaño del texto</p>
+                        </div>
+                        <div className="flex items-center gap-1 px-4 pb-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 flex-1 text-base font-bold"
+                            onClick={() => changeFontSize(-2)}
+                            disabled={fontSize <= 12}
+                            title="Reducir tamaño del texto"
+                          >
+                            A-
+                          </Button>
+                          <button
+                            className="min-w-12 rounded px-1 text-xs text-muted-foreground hover:bg-muted"
+                            onClick={() => changeFontSize(16 - fontSize)}
+                            title="Restablecer tamaño (100%)"
+                          >
+                            {Math.round((fontSize / 16) * 100)}%
+                          </button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 flex-1 text-base font-bold"
+                            onClick={() => changeFontSize(2)}
+                            disabled={fontSize >= 28}
+                            title="Ampliar tamaño del texto"
+                          >
+                            A+
+                          </Button>
+                        </div>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left"
+                          onClick={() => {
+                            setMoreMenuOpen(false);
+                            handleReadAloud();
+                          }}
+                        >
+                          {reading ? <Square className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                          {reading ? "Detener lectura" : "Leer en voz alta"}
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left text-destructive"
+                          onClick={() => {
+                            setMoreMenuOpen(false);
+                            setPendingDelete(selected);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Eliminar página
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="relative mb-1">
-                  <button
-                    className="text-5xl leading-none hover:bg-muted rounded-lg px-1 transition-colors"
-                    onClick={() => setIconPickerOpen(!iconPickerOpen)}
-                    title="Pick an icon"
-                  >
-                    {selected.icon ?? "📄"}
-                  </button>
+                  {selected.icon ? (
+                    <button
+                      className="text-5xl leading-none hover:bg-muted rounded-lg px-1 transition-colors"
+                      onClick={() => setIconPickerOpen(!iconPickerOpen)}
+                      title="Pick an icon"
+                    >
+                      {selected.icon}
+                    </button>
+                  ) : (
+                    <button
+                      className="rounded-lg px-1 py-1 text-sm text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground transition-colors"
+                      onClick={() => setIconPickerOpen(!iconPickerOpen)}
+                      title="Añadir icono"
+                    >
+                      + Añadir icono
+                    </button>
+                  )}
                   {iconPickerOpen && (
                     <div className="absolute z-20 mt-1 w-64 rounded-xl border bg-card p-2 shadow-lg">
                       <div className="grid grid-cols-10 gap-1">
@@ -581,47 +673,6 @@ export default function NotesPage() {
                   className="border-0 px-0 text-3xl font-bold shadow-none focus-visible:ring-0 h-auto py-1"
                 />
 
-                <div className="mt-1 mb-2 flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-base font-bold"
-                    onClick={() => changeFontSize(-2)}
-                    disabled={fontSize <= 12}
-                    title="Reducir tamaño del texto"
-                  >
-                    A-
-                  </Button>
-                  <button
-                    className="min-w-12 rounded px-1 text-xs text-muted-foreground hover:bg-muted"
-                    onClick={() => changeFontSize(16 - fontSize)}
-                    title="Restablecer tamaño (100%)"
-                  >
-                    {Math.round((fontSize / 16) * 100)}%
-                  </button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 text-base font-bold"
-                    onClick={() => changeFontSize(2)}
-                    disabled={fontSize >= 28}
-                    title="Ampliar tamaño del texto"
-                  >
-                    A+
-                  </Button>
-                  <span className="mx-1 h-5 w-px bg-border" />
-                  <Button
-                    size="sm"
-                    variant={reading ? "secondary" : "ghost"}
-                    className="h-8 gap-1.5 text-xs"
-                    onClick={handleReadAloud}
-                    title={reading ? "Detener lectura" : "Leer nota en voz alta"}
-                  >
-                    {reading ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                    {reading ? "Detener" : "Leer"}
-                  </Button>
-                </div>
-
                 <div className="mt-2">
                   <NotesEditor
                     key={selected.id}
@@ -630,13 +681,6 @@ export default function NotesPage() {
                     onChange={handleContentChange}
                     fontSize={fontSize}
                   />
-                </div>
-
-                <div className="mt-8 flex justify-end">
-                  <Button variant="ghost" size="sm" className="gap-1 text-destructive" onClick={() => setPendingDelete(selected)}>
-                    <Trash2 className="h-4 w-4" />
-                    Delete page
-                  </Button>
                 </div>
               </div>
             )}
