@@ -24,7 +24,11 @@ import {
   PanelLeft,
   Check,
   AlertCircle,
+  Volume2,
+  Square,
 } from "lucide-react";
+import { speak } from "@/lib/tts";
+import { blocksToPlainText, detectSpokenLang } from "@/lib/notes";
 import type { NotePage } from "@/types";
 
 const AuthGuard = dynamic(() => import("@/components/auth-guard").then(m => m.AuthGuard), { ssr: false });
@@ -74,6 +78,14 @@ export default function NotesPage() {
 
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentRef = useRef<unknown>(null);
+
+  const [fontSize, setFontSize] = useState(() => {
+    if (typeof window === "undefined") return 16;
+    const saved = Number(localStorage.getItem("notes-font-size"));
+    return Number.isFinite(saved) && saved >= 12 && saved <= 28 ? saved : 16;
+  });
+  const [reading, setReading] = useState(false);
 
   const loadPages = useCallback(async (selectId?: string | null) => {
     try {
@@ -108,7 +120,12 @@ export default function NotesPage() {
     setLastSavedAt(selected?.updated_at ?? null);
     setSaveStatus("saved");
     setIconPickerOpen(false);
-  }, [selectedId, selected?.title, selected?.updated_at]);
+    contentRef.current = selected?.content ?? null;
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {}
+    setReading(false);
+  }, [selectedId, selected?.title, selected?.updated_at, selected?.content]);
 
   const ancestorChain = useCallback(
     (id: string | null): string[] => {
@@ -154,8 +171,36 @@ export default function NotesPage() {
     titleTimer.current = setTimeout(() => persistTitle(selected.id, value), 600);
   };
 
+  const changeFontSize = (delta: number) => {
+    setFontSize((prev) => {
+      const next = Math.min(28, Math.max(12, prev + delta));
+      try {
+        localStorage.setItem("notes-font-size", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleReadAloud = () => {
+    if (!selected) return;
+    if (reading) {
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {}
+      setReading(false);
+      return;
+    }
+    const text = blocksToPlainText(contentRef.current);
+    if (!text.trim()) return;
+    setReading(true);
+    speak(`${selected.title}\n${text}`, detectSpokenLang(`${selected.title}\n${text}`));
+    // Reading ends on user stop or page change; cap the flag as a fallback.
+    setTimeout(() => setReading(false), Math.max(15000, text.length * 120));
+  };
+
   const handleContentChange = (content: unknown) => {
     if (!selected) return;
+    contentRef.current = content;
     setSaveStatus("saving");
     if (contentTimer.current) clearTimeout(contentTimer.current);
     contentTimer.current = setTimeout(() => {
@@ -536,12 +581,54 @@ export default function NotesPage() {
                   className="border-0 px-0 text-3xl font-bold shadow-none focus-visible:ring-0 h-auto py-1"
                 />
 
+                <div className="mt-1 mb-2 flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-base font-bold"
+                    onClick={() => changeFontSize(-2)}
+                    disabled={fontSize <= 12}
+                    title="Reducir tamaño del texto"
+                  >
+                    A-
+                  </Button>
+                  <button
+                    className="min-w-12 rounded px-1 text-xs text-muted-foreground hover:bg-muted"
+                    onClick={() => changeFontSize(16 - fontSize)}
+                    title="Restablecer tamaño (100%)"
+                  >
+                    {Math.round((fontSize / 16) * 100)}%
+                  </button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-base font-bold"
+                    onClick={() => changeFontSize(2)}
+                    disabled={fontSize >= 28}
+                    title="Ampliar tamaño del texto"
+                  >
+                    A+
+                  </Button>
+                  <span className="mx-1 h-5 w-px bg-border" />
+                  <Button
+                    size="sm"
+                    variant={reading ? "secondary" : "ghost"}
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={handleReadAloud}
+                    title={reading ? "Detener lectura" : "Leer nota en voz alta"}
+                  >
+                    {reading ? <Square className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    {reading ? "Detener" : "Leer"}
+                  </Button>
+                </div>
+
                 <div className="mt-2">
                   <NotesEditor
                     key={selected.id}
                     pageId={selected.id}
                     initialContent={selected.content}
                     onChange={handleContentChange}
+                    fontSize={fontSize}
                   />
                 </div>
 

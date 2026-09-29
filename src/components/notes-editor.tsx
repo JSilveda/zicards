@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
@@ -10,9 +10,10 @@ interface NotesEditorProps {
   pageId: string;
   initialContent: unknown;
   onChange: (content: unknown) => void;
+  fontSize?: number;
 }
 
-export function NotesEditor({ pageId, initialContent, onChange }: NotesEditorProps) {
+export function NotesEditor({ pageId, initialContent, onChange, fontSize = 16 }: NotesEditorProps) {
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
@@ -30,7 +31,10 @@ export function NotesEditor({ pageId, initialContent, onChange }: NotesEditorPro
   });
 
   return (
-    <div className="notes-editor-flush">
+    <div
+      className="notes-editor-flush"
+      style={{ "--notes-font-size": `${fontSize}px` } as CSSProperties}
+    >
       <BlockNoteView
         key={pageId}
         editor={editor}

@@ -93,6 +93,11 @@ body {
   padding-inline: 0;
 }
 
+/* Notes editor: adjustable body font size (accessibility) */
+.notes-editor-flush .bn-default-styles {
+  font-size: var(--notes-font-size, 16px);
+}
+
 /* Notes editor: blend the editor box into the page background (both modes) */
 .notes-editor-flush .bn-container,
 .notes-editor-flush .bn-editor {
