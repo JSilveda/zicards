@@ -75,10 +75,7 @@ function NavbarInner() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link href="/login">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm">Sign up</Button>
+              <Button size="sm">Log in</Button>
             </Link>
           </div>
         </div>

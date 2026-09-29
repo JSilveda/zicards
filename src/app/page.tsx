@@ -17,10 +17,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link href="/login">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm">Sign up</Button>
+              <Button size="sm">Log in</Button>
             </Link>
           </div>
         </div>
@@ -38,9 +35,9 @@ export default function LandingPage() {
             flip cards, and track your progress.
           </p>
           <div className="flex gap-4 justify-center">
-            <Link href="/register">
+            <Link href="/login">
               <Button size="lg" className="gap-2">
-                Get Started Free
+                Start Learning
                 <Zap className="h-4 w-4" />
               </Button>
             </Link>

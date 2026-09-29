@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,14 @@ import { ClientOnly } from "@/components/client-only";
 import { Zap } from "lucide-react";
 
 function RegisterForm() {
+  const router = useRouter();
+
+  // TEMPORARY: public registration disabled — send everyone to login.
+  // To re-enable, remove this effect.
+  useEffect(() => {
+    router.replace("/login");
+  }, [router]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
